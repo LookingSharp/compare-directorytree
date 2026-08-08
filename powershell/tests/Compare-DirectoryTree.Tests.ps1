@@ -58,6 +58,17 @@ BeforeAll {
         $Report | Where-Object { $_ -like 'RESULT:*' } | Select-Object -First 1
     }
 
+    function Get-CollapsedRow {
+        param(
+            [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][string[]] $Report,
+            [Parameter(Mandatory)][string] $Match
+        )
+
+        $Report |
+            Where-Object { $_ -match '^(<<|>>|<>)\s' -and $_ -like $Match } |
+            ForEach-Object { ($_ -replace '\s+', ' ').Trim() }
+    }
+
     function Get-FileSystemSnapshot {
         param([Parameter(Mandatory)][string] $Path)
 
@@ -79,7 +90,7 @@ Describe 'Compare-DirectoryTree' {
     }
 
     Context 'Scenario 10.1 - same ordinary files' {
-        It 'reports SAME with no differences' {
+        It 'reports MATCH with no differences' {
             New-TestFile (Join-Path $Left 'IMG_1001.JPG') 5000
             New-TestFile (Join-Path $Left 'IMG_1002.JPG') 6000
             New-TestFile (Join-Path $Right 'IMG_1001.JPG') 5000
@@ -90,7 +101,7 @@ Describe 'Compare-DirectoryTree' {
             Get-SummaryValue $report 'Same:' | Should -Be 2
             Get-SummaryValue $report 'Total differences:' | Should -Be 0
             Get-SummaryValue $report 'Relevant differences:' | Should -Be 0
-            Get-VerdictLine $report | Should -Be 'RESULT: SAME - all 2 files match'
+            Get-VerdictLine $report | Should -Be 'RESULT: MATCH - all 2 files match'
             Get-DifferenceRow $report | Should -BeNullOrEmpty
         }
     }
@@ -135,7 +146,7 @@ Describe 'Compare-DirectoryTree' {
             $rows[0] | Should -Match '^<>\s+IMG_1005\.JPG\s+5,238,104\s+5,238,105$'
             Get-SummaryValue $report 'Different size:' | Should -Be 1
             Get-SummaryValue $report 'Relevant differences:' | Should -Be 1
-            Get-VerdictLine $report | Should -Be 'RESULT: NOT THE SAME - 1 relevant difference'
+            Get-VerdictLine $report | Should -Be 'RESULT: DIFFERENT - 1 relevant difference'
         }
     }
 
@@ -153,7 +164,7 @@ Describe 'Compare-DirectoryTree' {
             Get-SummaryValue $report 'Total differences:' | Should -Be 1
             Get-SummaryValue $report 'Ignored metadata differences:' | Should -Be 1
             Get-SummaryValue $report 'Relevant differences:' | Should -Be 0
-            Get-VerdictLine $report | Should -Be 'RESULT: SAME - qualified: differences limited to 1 ignored metadata file'
+            Get-VerdictLine $report | Should -Be 'RESULT: MATCH - qualified: differences limited to 1 ignored metadata file'
         }
 
         It 'ignores every catalog entry listed in Appendix A.1' {
@@ -187,7 +198,7 @@ Describe 'Compare-DirectoryTree' {
             $rows[0] | Should -Match 'Recognized: XMP photo sidecar$'
             Get-SummaryValue $report 'Ignored metadata differences:' | Should -Be 0
             Get-SummaryValue $report 'Relevant differences:' | Should -Be 1
-            Get-VerdictLine $report | Should -BeLike 'RESULT: NOT THE SAME*'
+            Get-VerdictLine $report | Should -BeLike 'RESULT: DIFFERENT*'
         }
 
         It 'recognizes every Appendix A.2 entry without ignoring it' {
@@ -224,14 +235,14 @@ Describe 'Compare-DirectoryTree' {
     }
 
     Context 'Scenario 10.8 - both directories empty' {
-        It 'reports SAME with zero counts' {
+        It 'reports MATCH with zero counts' {
             $report = Compare-DirectoryTree $Left $Right -NoColor
 
             Get-SummaryValue $report 'LEFT files:' | Should -Be 0
             Get-SummaryValue $report 'RIGHT files:' | Should -Be 0
             Get-SummaryValue $report 'Total differences:' | Should -Be 0
             Get-SummaryValue $report 'Relevant differences:' | Should -Be 0
-            Get-VerdictLine $report | Should -Be 'RESULT: SAME - all 0 files match'
+            Get-VerdictLine $report | Should -Be 'RESULT: MATCH - all 0 files match'
         }
     }
 
@@ -398,9 +409,9 @@ Describe 'Compare-DirectoryTree' {
 
         It 'includes the legend and a single-line verdict' {
             $script:Report | Should -Contain 'Legend:'
-            $script:Report | Should -Contain '  <<  Exists only on LEFT'
-            $script:Report | Should -Contain '  >>  Exists only on RIGHT'
-            $script:Report | Should -Contain '  <>  Same filename, different size'
+            $script:Report | Should -Contain '  <<   Exists only on LEFT'
+            $script:Report | Should -Contain '  >>   Exists only on RIGHT'
+            $script:Report | Should -Contain '  <>   Same filename, different size'
             @($script:Report | Where-Object { $_ -like 'RESULT:*' }).Count | Should -Be 1
         }
 
@@ -473,6 +484,207 @@ Describe 'Compare-DirectoryTree' {
         }
     }
 
+    Context 'Scenario 10.15 - verdict vocabulary and Type column' {
+        BeforeEach {
+            foreach ($name in @('one.txt', 'two.txt')) {
+                New-TestFile (Join-Path $Left $name) 10
+                New-TestFile (Join-Path $Right $name) 10
+            }
+        }
+
+        It 'writes MATCH for a positive verdict and DIFFERENT for a negative one' {
+            $match = Compare-DirectoryTree $Left $Right -NoColor
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            $different = Compare-DirectoryTree $Left $Right -NoColor
+
+            Get-VerdictLine $match | Should -Be 'RESULT: MATCH - all 2 files match'
+            Get-VerdictLine $different | Should -Be 'RESULT: DIFFERENT - 1 relevant difference'
+        }
+
+        It 'keeps an exact search for RESULT: MATCH from matching a negative verdict' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            $report = Compare-DirectoryTree $Left $Right -NoColor
+
+            $report | Where-Object { $_.Contains('RESULT: MATCH') } | Should -BeNullOrEmpty
+            $report | Should -Not -Match 'NOT THE SAME'
+        }
+
+        It 'retains per-file same wording in the summary, header, and compact rows' {
+            $report = Compare-DirectoryTree $Left $Right -NoColor
+
+            $report | Should -Contain 'Same  : Matching filename and exact size in bytes.'
+            Get-SummaryValue $report 'Same:' | Should -Be 2
+
+            New-TestFile (Join-Path $Left 'Sub\a.txt') 1
+            New-TestFile (Join-Path $Right 'Sub\a.txt') 2
+            $compact = Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor
+            Get-CollapsedRow $compact '*Sub\*' | Should -Match '0 same '
+        }
+
+        It 'heads the table with Type and File / Directory' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            $report = Compare-DirectoryTree $Left $Right -NoColor
+
+            ($report | Where-Object { $_ -like '*Type*File / Directory*' }) | Should -Not -BeNullOrEmpty
+        }
+
+        It 'writes DIR for directory rows, leaves file rows blank, and never writes FILE' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            New-Item -ItemType Directory -Path (Join-Path $Left 'OnlyHere') -Force | Out-Null
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+            $rows = @(Get-DifferenceRow $report)
+
+            ($rows | Where-Object { $_ -like '*OnlyHere\*' }) | Should -Match '^<<  DIR   '
+            ($rows | Where-Object { $_ -like '*extra.txt*' }) | Should -Match '^<<        '
+            $rows | ForEach-Object { $_.Substring(4, 4) } | Should -Not -Be 'FILE'
+            $report | Should -Not -Match '\[DIR\]'
+        }
+
+        It 'begins directory paths and file paths in the same column' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            New-Item -ItemType Directory -Path (Join-Path $Left 'OnlyHere') -Force | Out-Null
+            $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -NoColor))
+
+            foreach ($row in $rows) {
+                $row.IndexOf($row.Trim().Split(' ')[-1]) | Should -BeGreaterThan 0
+                $row.Substring(0, 10) | Should -Match '^(<<|>>|<>)  (DIR |    )  $'
+            }
+        }
+    }
+
+    Context 'Scenario 10.16 - report formatting determinism' {
+        It 'abbreviates directory-summary byte totals but never file sizes' {
+            New-TestFile (Join-Path $Left 'Cache\big.bin') 81920
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            New-TestFile (Join-Path $Left 'plain.bin') 81920
+
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            Get-CollapsedRow $report '*Cache\*' | Should -Be '<< DIR Cache\ 1 file, 0 dirs, 80 KB'
+            Get-CollapsedRow $report '*Empty\*' | Should -Be '<< DIR Empty\ 0 files, 0 dirs, 0 B'
+            Get-CollapsedRow $report '*plain.bin*' | Should -Be '<< plain.bin 81,920 <missing>'
+        }
+
+        It 'formats aggregate byte totals per Section 5.3' {
+            Format-CDTAggregateByteTotal -Bytes 0 | Should -Be '0 B'
+            Format-CDTAggregateByteTotal -Bytes 81 | Should -Be '81 B'
+            Format-CDTAggregateByteTotal -Bytes 1023 | Should -Be '1023 B'
+            Format-CDTAggregateByteTotal -Bytes 1024 | Should -Be '1 KB'
+            Format-CDTAggregateByteTotal -Bytes 81920 | Should -Be '80 KB'
+            Format-CDTAggregateByteTotal -Bytes 8375186227 | Should -Be '7.8 GB'
+        }
+
+        It 'begins a directory-summary row text in the LEFT size column' {
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            $header = $report | Where-Object { $_ -like '*LEFT size (bytes)*' } | Select-Object -First 1
+            $row = $report | Where-Object { $_ -like '*DIR   Empty\*' } | Select-Object -First 1
+
+            $row.IndexOf('0 files') | Should -Be ($header.IndexOf('LEFT size (bytes)'))
+        }
+
+        It 'interleaves directory rows and file rows in one path ordering' {
+            New-TestFile (Join-Path $Right 'Camp\anchor.txt') 1
+            New-TestFile (Join-Path $Left 'Camp\anchor.txt') 1
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Camp\Empty') -Force | Out-Null
+            New-TestFile (Join-Path $Left 'Camp\IMG.JPG') 1
+            New-TestFile (Join-Path $Left 'Camp\Raw\a.cr2') 1
+            New-TestFile (Join-Path $Left 'Camp\Thumbs.db') 1
+
+            $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -NoColor) | Where-Object { $_ -like '<<*' })
+            $paths = @($rows | ForEach-Object { ($_ -replace '\s+', ' ').Split(' ') | Where-Object { $_ -like 'Camp\*' } })
+
+            $paths | Should -Be @('Camp\Empty\', 'Camp\IMG.JPG', 'Camp\Raw\', 'Camp\Thumbs.db')
+        }
+
+        It 'orders paths segment by segment rather than as whole strings' {
+            New-TestFile (Join-Path $Left 'a\b.txt') 1
+            New-TestFile (Join-Path $Left 'a.txt') 1
+
+            $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor) | Where-Object { $_ -like '<<*' })
+
+            ($rows -join "`n") | Should -Match '(?s)a\\b\.txt.*a\.txt'
+        }
+
+        It 'includes the DIR legend line only when a directory-summary row is present' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            $withoutDir = Compare-DirectoryTree $Left $Right -NoColor
+
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            $withDir = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            $withoutDir | Should -Not -Contain '  DIR  Directory summary row'
+            $withDir | Should -Contain '  DIR  Directory summary row'
+        }
+
+        It 'switches the legend wording for the difference marker with -Recurse' {
+            New-TestFile (Join-Path $Left 'diff.txt') 1
+            New-TestFile (Join-Path $Right 'diff.txt') 2
+
+            (Compare-DirectoryTree $Left $Right -NoColor) | Should -Contain '  <>   Same filename, different size'
+            (Compare-DirectoryTree $Left $Right -Recurse -NoColor) | Should -Contain '  <>   Same relative path, different size'
+        }
+
+        It 'includes the directory block and Structural differences only under -Recurse' {
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+
+            $flat = Compare-DirectoryTree $Left $Right -NoColor
+            $recursive = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            $flat | Should -Not -Match '^(LEFT directories:|Structural differences:)'
+            foreach ($label in @('LEFT directories:', 'RIGHT directories:', 'LEFT-only directories:', 'RIGHT-only directories:', 'Empty-directory differences:', 'Structural differences:')) {
+                $recursive | Where-Object { $_ -like "$label*" } | Should -Not -BeNullOrEmpty
+            }
+        }
+
+        It 'does not fold Empty-directory differences into Structural differences' {
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            New-TestFile (Join-Path $Left 'Full\a.txt') 1
+
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            Get-SummaryValue $report 'LEFT-only directories:' | Should -Be 2
+            Get-SummaryValue $report 'Empty-directory differences:' | Should -Be 1
+            Get-SummaryValue $report 'Structural differences:' | Should -Be 2
+        }
+
+        It 'keeps structural differences out of the file difference counters' {
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            Get-SummaryValue $report 'Total differences:' | Should -Be 0
+            Get-SummaryValue $report 'Ignored metadata differences:' | Should -Be 0
+            Get-SummaryValue $report 'Relevant differences:' | Should -Be 0
+        }
+
+        It 'orders verdict segments and omits zero-valued ones' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            New-TestFile (Join-Path $Left 'Thumbs.db') 1
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            New-TestFile (Join-Path $Left 'Full\a.txt') 1
+
+            $verdict = Get-VerdictLine (Compare-DirectoryTree $Left $Right -Recurse -NoColor)
+
+            $verdict | Should -Be 'RESULT: DIFFERENT - 2 relevant differences | 1 empty-subdirectory difference | 1 directory-structure difference | 1 ignored metadata difference'
+            $verdict | Should -Not -Match '\| 0 '
+        }
+
+        It 'sums the two structural verdict segments to Structural differences' {
+            New-TestFile (Join-Path $Left 'extra.txt') 1
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Empty') -Force | Out-Null
+            New-TestFile (Join-Path $Left 'Full\Deep\a.txt') 1
+
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+            $verdict = Get-VerdictLine $report
+
+            $empty = [int]([regex]::Match($verdict, '(\d+) empty-subdirectory').Groups[1].Value)
+            $structure = [int]([regex]::Match($verdict, '(\d+) directory-structure').Groups[1].Value)
+
+            ($empty + $structure) | Should -Be (Get-SummaryValue $report 'Structural differences:')
+        }
+    }
+
     Context 'Scenario 10.13 - recursive comparison' {
         BeforeEach {
             New-TestFile (Join-Path $Left 'Shared\same.txt') 10
@@ -488,7 +700,7 @@ Describe 'Compare-DirectoryTree' {
         It 'collapses a fully missing subtree at the highest missing directory' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Missing\*' }) | Should -Be '<<  [DIR] Missing\   2 files, 1 dir, 300 B'
+            Get-CollapsedRow $rows '*Missing\*' | Should -Be '<< DIR Missing\ 2 files, 1 dir, 300 B'
             $rows | Should -Not -Match 'Missing\\a\.bin'
             $rows | Should -Not -Match 'Missing\\Nested\\b\.bin'
         }
@@ -496,22 +708,23 @@ Describe 'Compare-DirectoryTree' {
         It 'keeps a collapsed subtree summary and its ignored counts on one line' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Cache\*' }) | Should -Be '<<  [DIR] Cache\   1 file, 0 dirs, 81,920 B | ignored metadata 1'
+            Get-CollapsedRow $rows '*Cache\*' | Should -Be '<< DIR Cache\ 1 file, 0 dirs, 80 KB | ignored metadata 1'
         }
 
         It 'reports a one-sided empty directory as 0 files, 0 dirs, 0 B' {
             New-Item -ItemType Directory -Path (Join-Path $Right 'Solo') -Force | Out-Null
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Solo\*' }) | Should -Be '>>  [DIR] Solo\   0 files, 0 dirs, 0 B'
+            Get-CollapsedRow $rows '*Solo\*' | Should -Be '>> DIR Solo\ 0 files, 0 dirs, 0 B'
         }
 
         It 'does not silently omit nested empty-directory structure' {
             $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
             $rows = @(Get-DifferenceRow $report)
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Empty\*' }) | Should -Be '<<  [DIR] Empty\   0 files, 1 dir, 0 B'
-            Get-SummaryValue $report 'Empty-subdirectory differences:' | Should -Be 2
+            Get-CollapsedRow $rows '*Empty\*' | Should -Be '<< DIR Empty\ 0 files, 1 dir, 0 B'
+            Get-SummaryValue $report 'Empty-directory differences:' | Should -Be 1
+            Get-SummaryValue $report 'Structural differences:' | Should -Be 5
         }
 
         It 'reports file differences in shared directories individually with root-relative paths' {
@@ -541,9 +754,9 @@ Describe 'Compare-DirectoryTree' {
                 $report = Compare-DirectoryTree $pair.Left $pair.Right -Recurse -NoColor
                 $rows = @(Get-DifferenceRow $report)
 
-                ($rows | Where-Object { $_ -like '*[[]DIR[]] Cache\*' }) | Should -Not -BeNullOrEmpty
+                Get-CollapsedRow $rows '*Cache\*' | Should -Not -BeNullOrEmpty
                 Get-SummaryValue $report 'Relevant differences:' | Should -Be 0
-                Get-VerdictLine $report | Should -Be 'RESULT: SAME - qualified: differences limited to 1 ignored metadata file'
+                Get-VerdictLine $report | Should -Be 'RESULT: MATCH - qualified: directory structure differs; other differences limited to ignorable metadata'
             }
             finally {
                 Remove-Item -LiteralPath $pair.Base -Recurse -Force -ErrorAction SilentlyContinue
@@ -553,13 +766,13 @@ Describe 'Compare-DirectoryTree' {
         It 'contributes underlying relevant differences from a collapsed subtree' {
             $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
 
-            Get-VerdictLine $report | Should -Be 'RESULT: NOT THE SAME - 3 relevant differences | 2 empty-subdirectory differences | 1 ignored metadata difference'
+            Get-VerdictLine $report | Should -Be 'RESULT: DIFFERENT - 3 relevant differences | 1 empty-subdirectory difference | 4 directory-structure differences | 1 ignored metadata difference'
         }
 
         It 'summarizes shared directories per directory in -Compact mode' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Shared\*' }) | Should -Be '<>  [DIR] Shared\   1 same | << 0 | >> 0 | <> 1'
+            Get-CollapsedRow $rows '*Shared\*' | Should -Be '<> DIR Shared\ 1 same | << 0 | >> 0 | <> 1'
             $rows | Should -Not -Match 'Shared\\diff\.txt'
         }
 
@@ -569,14 +782,14 @@ Describe 'Compare-DirectoryTree' {
 
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Shared\ *' }) | Should -Be '<>  [DIR] Shared\   1 same | << 0 | >> 0 | <> 1'
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Shared\Deep\*' }) | Should -Be '<>  [DIR] Shared\Deep\   0 same | << 0 | >> 0 | <> 1'
+            Get-CollapsedRow $rows '*Shared\ *' | Should -Be '<> DIR Shared\ 1 same | << 0 | >> 0 | <> 1'
+            Get-CollapsedRow $rows '*Shared\Deep\*' | Should -Be '<> DIR Shared\Deep\ 0 same | << 0 | >> 0 | <> 1'
         }
 
         It 'retains collapsed one-sided subtree behavior in -Compact mode' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Missing\*' }) | Should -Be '<<  [DIR] Missing\   2 files, 1 dir, 300 B'
+            Get-CollapsedRow $rows '*Missing\*' | Should -Be '<< DIR Missing\ 2 files, 1 dir, 300 B'
         }
 
         It 'reports one-sided subtree files individually with -ExpandMissingSubtrees' {
@@ -589,13 +802,13 @@ Describe 'Compare-DirectoryTree' {
         It 'reports empty descendant directories explicitly with -ExpandMissingSubtrees' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor))
 
-            ($rows | Where-Object { $_ -like '*[[]DIR[]] Empty\*' }) | Should -Be '<<  [DIR] Empty\   0 files, 1 dir, 0 B'
+            Get-CollapsedRow $rows '*Empty\*' | Should -Be '<< DIR Empty\ 0 files, 1 dir, 0 B'
         }
 
         It 'does not emit redundant non-empty ancestor rows with -ExpandMissingSubtrees' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor))
 
-            $rows | Where-Object { $_ -like '*[[]DIR[]] Missing\*' } | Should -BeNullOrEmpty
+            Get-CollapsedRow $rows '*DIR Missing\*' | Should -BeNullOrEmpty
         }
 
         It 'keeps summary counts identical across recursive presentation modes' {
@@ -603,7 +816,7 @@ Describe 'Compare-DirectoryTree' {
             $compact = Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor
             $expanded = Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor
 
-            foreach ($label in @('LEFT files:', 'RIGHT files:', 'Same:', 'Different size:', 'LEFT only:', 'RIGHT only:', 'Total differences:', 'Ignored metadata differences:', 'Relevant differences:', 'Empty-subdirectory differences:')) {
+            foreach ($label in @('LEFT files:', 'RIGHT files:', 'Same:', 'Different size:', 'LEFT only:', 'RIGHT only:', 'Total differences:', 'Ignored metadata differences:', 'Relevant differences:', 'Empty-directory differences:')) {
                 Get-SummaryValue $compact $label | Should -Be (Get-SummaryValue $default $label)
                 Get-SummaryValue $expanded $label | Should -Be (Get-SummaryValue $default $label)
             }
@@ -628,7 +841,7 @@ Describe 'Compare-DirectoryTree' {
             }
         }
 
-        It 'qualifies a SAME verdict when only empty directories differ' {
+        It 'qualifies a MATCH verdict when only empty directories differ' {
             $pair = New-TestDirectoryPair
             try {
                 New-Item -ItemType Directory -Path (Join-Path $pair.Left 'OnlyHere') -Force | Out-Null
@@ -636,14 +849,14 @@ Describe 'Compare-DirectoryTree' {
                 $report = Compare-DirectoryTree $pair.Left $pair.Right -Recurse -NoColor
 
                 Get-SummaryValue $report 'Relevant differences:' | Should -Be 0
-                Get-VerdictLine $report | Should -Be 'RESULT: SAME - qualified: different empty subdirectories'
+                Get-VerdictLine $report | Should -Be 'RESULT: MATCH - qualified: different empty subdirectories'
             }
             finally {
                 Remove-Item -LiteralPath $pair.Base -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
 
-        It 'qualifies a SAME verdict when structure and ignorable metadata both differ' {
+        It 'qualifies a MATCH verdict when structure and ignorable metadata both differ' {
             $pair = New-TestDirectoryPair
             try {
                 New-Item -ItemType Directory -Path (Join-Path $pair.Left 'OnlyHere') -Force | Out-Null
@@ -651,7 +864,7 @@ Describe 'Compare-DirectoryTree' {
 
                 $report = Compare-DirectoryTree $pair.Left $pair.Right -Recurse -NoColor
 
-                Get-VerdictLine $report | Should -Be 'RESULT: SAME - qualified: different empty subdirectories; other differences limited to ignorable metadata'
+                Get-VerdictLine $report | Should -Be 'RESULT: MATCH - qualified: different empty subdirectories; other differences limited to ignorable metadata'
             }
             finally {
                 Remove-Item -LiteralPath $pair.Base -Recurse -Force -ErrorAction SilentlyContinue
@@ -663,10 +876,12 @@ Describe 'Compare-DirectoryTree' {
             $compact = Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor
             $expanded = Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor
 
-            $default | Should -Contain 'Scope : All files beneath these directories; subdirectories ARE searched.'
-            $default | Should -Contain '        Presentation: one-sided subtrees collapsed at the highest missing directory.'
-            $compact | Should -Contain '        Presentation: compact directory summaries.'
-            $expanded | Should -Contain '        Presentation: one-sided subtrees expanded file by file.'
+            $default | Should -Contain 'Scope : Files in these directories and all subdirectories.'
+            $default | Should -Contain '        Presentation: default recursive mode.'
+            $compact | Should -Contain '        Presentation: compact.'
+            $expanded | Should -Contain '        Presentation: expand missing subtrees.'
+            $default | Should -Contain 'Match : Relative paths are compared case-insensitively.'
+            $default | Should -Contain 'Same  : Matching relative path and exact size in bytes.'
         }
 
         It 'rejects combined and unsupported presentation switches' {
@@ -733,11 +948,11 @@ Describe 'Compare-DirectoryTree' {
         }
 
         It 'colors only the verdict phrase' {
-            $notSame = Add-CDTColor -Line @('RESULT: NOT THE SAME - 2 relevant differences | 1 ignored metadata difference')
-            $same = Add-CDTColor -Line @('RESULT: SAME - all 3 files match')
+            $different = Add-CDTColor -Line @('RESULT: DIFFERENT - 2 relevant differences | 1 ignored metadata difference')
+            $match = Add-CDTColor -Line @('RESULT: MATCH - all 3 files match')
 
-            $notSame | Should -Be "RESULT: $script:Escape[31mNOT THE SAME$script:Escape[0m - 2 relevant differences | 1 ignored metadata difference"
-            $same | Should -Be "RESULT: $script:Escape[32mSAME$script:Escape[0m - all 3 files match"
+            $different | Should -Be "RESULT: $script:Escape[31mDIFFERENT$script:Escape[0m - 2 relevant differences | 1 ignored metadata difference"
+            $match | Should -Be "RESULT: $script:Escape[32mMATCH$script:Escape[0m - all 3 files match"
         }
 
         It 'does not color ordinary difference rows red' {
@@ -752,7 +967,10 @@ Describe 'Compare-DirectoryTree' {
                 New-Item -ItemType Directory -Path (Join-Path $pair.Left 'OnlyHere') -Force | Out-Null
                 $colored = @(Add-CDTColor -Line (Compare-DirectoryTree $pair.Left $pair.Right -Recurse -NoColor))
 
-                ($colored | Where-Object { $_ -like '*[[]DIR[]] OnlyHere\*' }) | Should -Be "$script:Escape[36m<<$script:Escape[0m  [DIR] OnlyHere\   0 files, 0 dirs, 0 B"
+                $row = $colored | Where-Object { $_ -like '*OnlyHere\*' }
+                $prefix = "$script:Escape[36m<<$script:Escape[0m"
+                $row.StartsWith($prefix) | Should -BeTrue
+                $row.Substring($prefix.Length) | Should -Not -Match ([regex]::Escape($script:Escape))
             }
             finally {
                 Remove-Item -LiteralPath $pair.Base -Recurse -Force -ErrorAction SilentlyContinue
@@ -783,9 +1001,9 @@ Describe 'Compare-DirectoryTree' {
         }
 
         It 'remains understandable without color' {
-            $script:Plain | Should -Contain '  <<  Exists only on LEFT'
+            $script:Plain | Should -Contain '  <<   Exists only on LEFT'
             ($script:Plain | Where-Object { $_ -like '*Thumbs.db*' }) | Should -Match 'Ignored:'
-            Get-VerdictLine $script:Plain | Should -BeLike '*NOT THE SAME*'
+            Get-VerdictLine $script:Plain | Should -BeLike '*DIFFERENT*'
         }
     }
 }
