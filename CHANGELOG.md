@@ -11,9 +11,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - Specified recursive comparison (`-Recurse`) with the Default, `-Compact`,
   and `-ExpandMissingSubtrees` presentation modes, directory-structure and
-  empty-directory reporting, missing-subtree collapse, and qualified SAME
+  empty-directory reporting, missing-subtree collapse, and qualified MATCH
   verdicts.
 - Specified sparse console color presentation and the `-NoColor` switch.
+- Specified byte-size formatting: file size columns always show exact bytes with
+  thousands separators, while directory-summary rows use abbreviated 1024-based
+  aggregate totals.
+- Specified a canonical recursive report, including the `LEFT directories`,
+  `RIGHT directories`, `LEFT-only directories`, `RIGHT-only directories`,
+  `Empty-directory differences`, and `Structural differences` summary counters.
+- Specified the verdict grammar: fixed segment and qualification-clause order,
+  omission of zero-valued segments, and singular/plural count wording.
+- Specified deterministic ordering within a difference class, including how
+  directory-summary rows interleave with file rows.
+- Specified legend content, including the `DIR` entry and the recursive
+  `Same relative path, different size` wording.
 
 ### Changed
 
