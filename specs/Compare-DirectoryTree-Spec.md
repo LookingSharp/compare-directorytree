@@ -129,20 +129,22 @@ Within each class, entries are sorted deterministically by path.
 
 A blank line separates non-empty difference classes.
 
-Directory summary rows use the same markers:
+Directory summary rows use the same markers and identify themselves with `DIR` in the `Type` column:
 
 ```text
-<<  [DIR] ...
->>  [DIR] ...
-<>  [DIR] ...
+<<  DIR   ...
+>>  DIR   ...
+<>  DIR   ...
 ```
+
+Directory-summary rows and file rows begin their path in the same column. The narrow `Type` column carries the distinction so that the pathname itself is never shifted, which preserves vertical scanning. Ordinary file rows leave the `Type` column blank; `FILE` is never written.
 
 ### 5.1 One-line comparison entries
 
 Every comparison entry occupies one physical output line. This applies to:
 
 - file difference rows,
-- `[DIR]` subtree summaries,
+- `DIR` subtree summaries,
 - empty-directory rows,
 - metadata annotations associated with those rows,
 - and the final verdict line.
@@ -152,13 +154,13 @@ Do not emit continuation lines beneath a comparison row merely to explain counts
 Correct:
 
 ```text
-<<  [DIR] 2018\Camp\Raw\   214 files, 18 dirs, 7.8 GB | ignored metadata 2
+<<  DIR   2018\Camp\Raw\   214 files, 18 dirs, 7.8 GB | ignored metadata 2
 ```
 
 Not:
 
 ```text
-<<  [DIR] 2018\Camp\Raw\   214 files, 18 dirs, 7.8 GB
+<<  DIR   2018\Camp\Raw\   214 files, 18 dirs, 7.8 GB
                               2 ignored metadata files
 ```
 
@@ -198,23 +200,23 @@ Relevant differences:           4
 DIFFERENCES
 -----------
 
-    File                                  LEFT size (bytes)   RIGHT size (bytes)   Note
-    ----                                  -----------------   ------------------   ----
-<<  IMG_1901.JPG                                  5,238,104            <missing>
-<<  IMG_1902.JPG                                  4,921,772            <missing>
-<<  Thumbs.db                                        81,920            <missing>   Ignored: Windows thumbnail cache
+    Type  File / Directory                      LEFT size (bytes)   RIGHT size (bytes)   Note
+    ----  ----------------                      -----------------   ------------------   ----
+<<        IMG_1901.JPG                                  5,238,104            <missing>
+<<        IMG_1902.JPG                                  4,921,772            <missing>
+<<        Thumbs.db                                        81,920            <missing>   Ignored: Windows thumbnail cache
 
->>  IMG_1842-edited.jpg                           <missing>            4,790,441
+>>        IMG_1842-edited.jpg                           <missing>            4,790,441
 
-<>  IMG_1842.JPG                                  4,821,334            4,817,902
-<>  .DS_Store                                         6,148                8,196   Ignored: macOS Finder metadata
+<>        IMG_1842.JPG                                  4,821,334            4,817,902
+<>        .DS_Store                                         6,148                8,196   Ignored: macOS Finder metadata
 
 Legend:
   <<  Exists only on LEFT
   >>  Exists only on RIGHT
   <>  Same filename, different size
 
-RESULT: NOT THE SAME - 4 relevant differences | 2 ignored metadata differences
+RESULT: DIFFERENT - 4 relevant differences | 2 ignored metadata differences
 ```
 
 When `-Recurse` is specified, the `Scope` line must describe the recursive scope and the active presentation mode instead of stating that subdirectories are not searched.
@@ -228,6 +230,7 @@ Report requirements:
 - Matching files are summarized by count and are not individually listed by default.
 - Empty difference classes do not need placeholder rows.
 - Metadata annotations appear in a final `Note` column.
+- Directory-summary rows write `DIR` in the `Type` column; ordinary file rows leave it blank.
 - The report must distinguish detected differences from differences that affect the final result.
 
 ## 6. Recursive Comparison
@@ -249,7 +252,7 @@ The first root remains LEFT and the second root remains RIGHT.
 No additional presentation switch.
 
 - Directories present on both sides are traversed and their file differences are reported normally, individually, using root-relative paths.
-- A directory subtree present on only one side is collapsed at the highest missing directory into one `[DIR]` summary row.
+- A directory subtree present on only one side is collapsed at the highest missing directory into one `DIR` summary row.
 - Descendants of that collapsed missing subtree are not redundantly listed.
 - Empty missing directories are still reported.
 
@@ -257,7 +260,7 @@ No additional presentation switch.
 
 Summarize differences by directory instead of listing individual differing files within shared directories.
 
-- A shared directory with direct file differences produces one `[DIR]` summary row.
+- A shared directory with direct file differences produces one `DIR` summary row.
 - The summary counts files directly in that directory; descendant directories with differences receive their own rows.
 - This preserves the location of differences rather than allowing a high-level directory to swallow all descendant detail.
 - Fully one-sided subtrees remain collapsed at the highest missing directory, as in the default mode, using the Section 6.4 collapsed-summary grammar rather than the direct-file grammar below.
@@ -266,20 +269,20 @@ Summarize differences by directory instead of listing individual differing files
 Shared-directory grammar:
 
 ```text
-<>  [DIR] <relative-path>\   <same> same | << <left-only> | >> <right-only> | <> <different-size> | ignored <count>
+<>  DIR   <relative-path>\   <same> same | << <left-only> | >> <right-only> | <> <different-size> | ignored <count>
 ```
 
 Example:
 
 ```text
-<>  [DIR] 2018\Camp\Cache\   34 same | << 6 | >> 0 | <> 2 | ignored 1
+<>  DIR   2018\Camp\Cache\   34 same | << 6 | >> 0 | <> 2 | ignored 1
 ```
 
 Omit `| ignored <count>` when the count is zero.
 
 The counts apply to files directly contained in that directory, not recursively to descendant shared directories. This prevents double-counting and preserves useful location information.
 
-A Compact `[DIR]` row is shown only when that directory has:
+A Compact `DIR` row is shown only when that directory has:
 
 - direct file differences,
 - a directory-structure difference that must be surfaced,
@@ -293,17 +296,17 @@ Use normal file-level reporting even inside directories that exist on only one s
 
 - A one-sided subtree is traversed instead of represented by one collapsed summary row.
 - Descendant files are reported individually with their root-relative paths.
-- Empty descendant directories are reported explicitly as `[DIR]` rows, because they otherwise have no visible descendant entry.
-- Non-empty container directories are not redundantly listed when their contents make their existence evident; do not emit summary `[DIR]` rows for non-empty ancestor directories merely to restate that the subtree is missing.
+- Empty descendant directories are reported explicitly as `DIR` rows, because they otherwise have no visible descendant entry.
+- Non-empty container directories are not redundantly listed when their contents make their existence evident; do not emit summary `DIR` rows for non-empty ancestor directories merely to restate that the subtree is missing.
 - Metadata annotations use the normal file-note policy.
 - Shared directories behave as in the default recursive mode.
 
 Example:
 
 ```text
-<<  2018\Camp\Raw\IMG_1001.JPG             5,238,104        <missing>
-<<  2018\Camp\Raw\Nested\IMG_1002.JPG      4,921,772        <missing>
-<<  [DIR] 2018\Camp\Raw\Empty\             0 files, 0 dirs, 0 B
+<<        2018\Camp\Raw\IMG_1001.JPG             5,238,104        <missing>
+<<        2018\Camp\Raw\Nested\IMG_1002.JPG      4,921,772        <missing>
+<<  DIR   2018\Camp\Raw\Empty\             0 files, 0 dirs, 0 B
 ```
 
 This mode is intentionally verbose and is intended for cases where the user wants the full inventory of a missing subtree.
@@ -313,7 +316,7 @@ This mode is intentionally verbose and is intended for cases where the user want
 In the default and Compact modes, if an entire directory subtree exists only on one side, report the highest missing subtree once and do not additionally list its descendants.
 
 ```text
-<<  [DIR] 2018\Camp\Raw\   214 files, 18 dirs, 7.8 GB | ignored metadata 2
+<<  DIR   2018\Camp\Raw\   214 files, 18 dirs, 7.8 GB | ignored metadata 2
 ```
 
 The one-line subtree summary must account for all descendants so the user can see that the entire subtree was considered.
@@ -332,7 +335,7 @@ Counts are recursive for collapsed one-sided subtrees.
 Empty directories are observable and must be reported in all recursive modes.
 
 ```text
-<<  [DIR] 2018\Camp\Empty\   0 files, 0 dirs, 0 B
+<<  DIR   2018\Camp\Empty\   0 files, 0 dirs, 0 B
 ```
 
 This prevents an empty-directory difference from appearing to have been overlooked.
@@ -351,19 +354,19 @@ A subtree whose only file differences are explicitly ignorable metadata is still
 Collapsed:
 
 ```text
-<<  [DIR] 2018\Camp\Cache\   1 file, 0 dirs, 81,920 B | ignored metadata 1
+<<  DIR   2018\Camp\Cache\   1 file, 0 dirs, 81,920 B | ignored metadata 1
 ```
 
 Compact shared directory:
 
 ```text
-<>  [DIR] 2018\Camp\Cache\   34 same | << 1 | >> 0 | <> 0 | ignored 1
+<>  DIR   2018\Camp\Cache\   34 same | << 1 | >> 0 | <> 0 | ignored 1
 ```
 
 Expanded:
 
 ```text
-<<  2018\Camp\Cache\Thumbs.db   81,920   <missing>   Ignored: Windows thumbnail cache
+<<        2018\Camp\Cache\Thumbs.db   81,920   <missing>   Ignored: Windows thumbnail cache
 ```
 
 If every difference in the relevant subtree is ignorable metadata, it does not create a relevant difference, but the final verdict is qualified.
@@ -402,7 +405,7 @@ In interactive color output:
 <>  yellow
 ```
 
-Only the two-character marker is colored, on both file rows and directory-summary rows. `[DIR]`, paths, sizes, and notes remain in the normal foreground color.
+Only the two-character marker is colored, on both file rows and directory-summary rows. The `Type` column, paths, sizes, and notes remain in the normal foreground color.
 
 ### 7.3 Semantic colors
 
@@ -411,22 +414,22 @@ The `Ignored: ...` annotation is displayed in a dim/gray treatment when supporte
 Only the verdict phrase receives verdict color:
 
 ```text
-RESULT: SAME - all 243 files match
-        ^^^^
+RESULT: MATCH - all 243 files match
+        ^^^^^
         green
 ```
 
 ```text
-RESULT: NOT THE SAME - 4 relevant differences
-        ^^^^^^^^^^^^
+RESULT: DIFFERENT - 4 relevant differences
+        ^^^^^^^^^
         red
 ```
 
 `RESULT:` and all qualification/count text remain in the normal foreground color.
 
-Green is reserved for `SAME`. Red is reserved for `NOT THE SAME` and must not be used for ordinary LEFT-, RIGHT-, or different-file rows. This prevents the report body from visually presenting every difference as an error.
+Green is reserved for `MATCH`. Red is reserved for `DIFFERENT` and must not be used for ordinary LEFT-, RIGHT-, or different-file rows. This prevents the report body from visually presenting every difference as an error.
 
-Empty-directory differences and other qualified-SAME structural conditions do not receive a separate color; their existing `<<` or `>>` marker provides the directional cue and the row text explains the condition.
+Empty-directory differences and other qualified-MATCH structural conditions do not receive a separate color; their existing `<<` or `>>` marker provides the directional cue and the row text explains the condition.
 
 ### 7.4 No color dependency
 
@@ -436,7 +439,7 @@ No meaning may depend solely on color:
 - RIGHT-only remains identified by `>>`.
 - Different remains identified by `<>`.
 - Ignored metadata remains explicitly labeled `Ignored:`.
-- SAME/NOT THE SAME remains written in text.
+- MATCH/DIFFERENT remains written in text.
 - Structural qualifications remain written in text.
 
 The report must remain fully understandable when color is unavailable, disabled, redirected, copied as plain text, or viewed by a user who cannot distinguish the selected colors.
@@ -500,40 +503,44 @@ The overall result is based on `Relevant differences`. Structural and ignorable 
 
 Verdict lines are single lines.
 
+The verdict vocabulary is `MATCH` and `DIFFERENT`. These tokens share no substring, so an exact search for `RESULT: MATCH` cannot also match a `RESULT: DIFFERENT` verdict. `MATCH` means the directories match under the comparison rules declared in the report header; it does not imply byte-for-byte content identity.
+
+The per-file `Same` summary counter, the `Same  :` header rule line, the Section 3 definition of same, and the `-Compact` `<same> same` counts describe per-file equality rather than the overall verdict, and retain that wording.
+
 ### Result: relevant differences exist
 
 ```text
-RESULT: NOT THE SAME - 4 relevant differences | 2 ignored metadata differences
+RESULT: DIFFERENT - 4 relevant differences | 2 ignored metadata differences
 ```
 
 Under `-Recurse`, structural counts are included when nonzero:
 
 ```text
-RESULT: NOT THE SAME - 4 relevant differences | 2 empty-subdirectory differences | 3 ignored metadata differences
+RESULT: DIFFERENT - 4 relevant differences | 2 empty-subdirectory differences | 3 ignored metadata differences
 ```
 
 ### Result: only ignored metadata differs
 
 ```text
-RESULT: SAME - qualified: differences limited to 2 ignored metadata files
+RESULT: MATCH - qualified: differences limited to 2 ignored metadata files
 ```
 
 ### Result: only directory structure differs
 
 ```text
-RESULT: SAME - qualified: different empty subdirectories
+RESULT: MATCH - qualified: different empty subdirectories
 ```
 
 ### Result: structure and ignorable metadata differ
 
 ```text
-RESULT: SAME - qualified: different empty subdirectories; other differences limited to ignorable metadata
+RESULT: MATCH - qualified: different empty subdirectories; other differences limited to ignorable metadata
 ```
 
 ### Result: no differences
 
 ```text
-RESULT: SAME - all 243 files match
+RESULT: MATCH - all 243 files match
 ```
 
 The report must not use the unqualified word `identical`, because file contents are not compared.
@@ -596,7 +603,7 @@ Expected:
 - Same = 2
 - Total differences = 0
 - Relevant differences = 0
-- Result = SAME
+- Result = MATCH
 
 ### 10.2 File only on LEFT
 
@@ -655,7 +662,7 @@ Expected:
 - Total differences increases by one.
 - Ignored metadata differences increases by one.
 - Relevant differences remains zero.
-- Overall result = SAME, qualified.
+- Overall result = MATCH, qualified.
 
 ### 10.6 Recognized metadata that remains relevant
 
@@ -666,7 +673,7 @@ Expected:
 - The file is recognized as an XMP sidecar.
 - It is not ignored.
 - The row remains a relevant difference.
-- Overall result = NOT THE SAME.
+- Overall result = DIFFERENT.
 
 ### 10.7 Hidden or system ordinary file
 
@@ -686,7 +693,7 @@ Expected:
 - RIGHT files = 0
 - Total differences = 0
 - Relevant differences = 0
-- Result = SAME
+- Result = MATCH
 
 ### 10.9 One directory empty
 
@@ -735,7 +742,7 @@ The recursive implementation must demonstrate at least these behaviors:
 1. A fully missing nested subtree is collapsed at its highest missing directory in Default mode.
 2. Descendants of a collapsed missing subtree are not redundantly listed.
 3. A collapsed subtree summary is entirely one line.
-4. Ignored-metadata counts on `[DIR]` rows are on the same line as the subtree summary.
+4. Ignored-metadata counts on `DIR` rows are on the same line as the subtree summary.
 5. An empty directory existing on only one side is reported as `0 files, 0 dirs, 0 B`.
 6. Nested empty-directory structure is not silently omitted.
 7. A metadata-only subtree remains visible without creating a relevant difference when every differing file is ignorable.
@@ -748,7 +755,7 @@ The recursive implementation must demonstrate at least these behaviors:
 14. `-ExpandMissingSubtrees` reports empty descendant directories explicitly.
 15. `-ExpandMissingSubtrees` does not redundantly emit non-empty ancestor directory rows in addition to their expanded contents.
 16. Summary counts reflect actual represented files/directories rather than merely displayed rows.
-17. A SAME verdict is qualified whenever directory structure differs or file differences consist only of ignored metadata.
+17. A MATCH verdict is qualified whenever directory structure differs or file differences consist only of ignored metadata.
 18. `-Compact` and `-ExpandMissingSubtrees` cannot be combined.
 19. Recursive presentation switches are not accepted without `-Recurse`.
 20. No recursive mode makes an observed filesystem object appear to have been silently skipped.
@@ -758,11 +765,11 @@ The recursive implementation must demonstrate at least these behaviors:
 The color implementation must demonstrate at least these behaviors:
 
 1. In an interactive colored console, `<<` is cyan, `>>` is magenta, and `<>` is yellow.
-2. Only the marker is directionally colored; filenames, paths, `[DIR]`, sizes, and ordinary notes remain neutral.
+2. Only the marker is directionally colored; filenames, paths, the `Type` column, sizes, and ordinary notes remain neutral.
 3. `Ignored: ...` annotations are dim/gray when color is enabled.
 4. Ignored metadata rows retain the normal directional marker color.
-5. Only `SAME` is green in a SAME verdict.
-6. Only `NOT THE SAME` is red in a NOT THE SAME verdict.
+5. Only `MATCH` is green in a MATCH verdict.
+6. Only `DIFFERENT` is red in a DIFFERENT verdict.
 7. Ordinary relevant difference rows are not red.
 8. Empty-directory/structural differences do not receive an additional special color.
 9. `-NoColor` removes all color without changing report text, ordering, spacing, or semantics.
@@ -770,6 +777,20 @@ The color implementation must demonstrate at least these behaviors:
 11. The report remains fully understandable without color.
 12. Color does not cause a comparison entry to span additional physical lines.
 13. The normal report does not add a separate color legend.
+
+### 10.15 Verdict vocabulary and Type column
+
+The report implementation must demonstrate at least these behaviors:
+
+1. A positive verdict reads `RESULT: MATCH`; a negative verdict reads `RESULT: DIFFERENT`.
+2. An exact search for `RESULT: MATCH` does not match a `RESULT: DIFFERENT` verdict.
+3. Qualified positive verdicts read `RESULT: MATCH - qualified: ...`.
+4. The `Same` summary counter, the `Same  :` header rule line, and the `-Compact` `<same> same` counts retain the per-file "same" wording.
+5. The differences table header includes `Type` and `File / Directory`.
+6. Directory-summary rows show `DIR` in the `Type` column.
+7. File rows leave the `Type` column blank and never show `FILE`.
+8. Directory paths and file paths begin in the same column.
+9. Introducing the `Type` column does not cause any comparison entry to span more than one physical line.
 
 ## 11. Out of Scope
 
@@ -887,9 +908,12 @@ Implementation technique is intentionally not prescribed. The delivered behavior
 23. Metadata classification behavior is centralized and extensible; adding a catalog rule should not require changing the comparison/report semantics.
 24. Metadata classification is deterministic; conflicting classifications must not be silently resolved arbitrarily.
 25. Every comparison entry and the verdict occupy exactly one physical output line.
-26. Directory-structure differences never increase Relevant differences but do qualify a SAME verdict.
+26. Directory-structure differences never increase Relevant differences but do qualify a MATCH verdict.
 27. Summary counts reflect represented files and directories rather than displayed rows.
 28. `-Compact` and `-ExpandMissingSubtrees` are mutually exclusive and require `-Recurse`.
 29. No meaning depends solely on color; `-NoColor` and redirected output are semantically identical to colored output.
 30. Redirected or plain-text output contains no terminal color escape sequences.
 31. The utility never modifies either input directory.
+32. Verdicts use `MATCH` and `DIFFERENT`; no report output contains `NOT THE SAME`, and an exact search for `RESULT: MATCH` cannot match a `RESULT: DIFFERENT` verdict.
+33. Directory-summary rows and file rows begin their path in the same column; directory rows show `DIR` in the `Type` column, file rows leave it blank, and `FILE` is never written.
+34. No report output contains the `[DIR]` name prefix.
