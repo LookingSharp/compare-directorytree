@@ -24,3 +24,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the authoritative specification and removed them from `specs/speclets/`.
 - Verdict lines are now single-line, consistent with the one-line
   comparison-entry rule.
+- Proposed (speclet, not yet merged into the authoritative specification):
+  replace the `SAME` / `NOT THE SAME` verdict pair with `MATCH` / `DIFFERENT`,
+  and replace the inline `[DIR]` name prefix with a dedicated `Type` column.
+  See `specs/speclets/report-verdict-and-type-column.md`.
