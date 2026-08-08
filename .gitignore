@@ -1,0 +1,17 @@
+# Temporary, editor, and local-development artifacts
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+
+# Test output
+TestResults/
+*.trx
+
+# Local environment overrides
+*.local
