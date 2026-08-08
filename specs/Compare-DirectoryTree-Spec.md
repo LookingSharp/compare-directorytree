@@ -23,7 +23,7 @@ The comparison is preservation-oriented:
 - relevant file differences determine whether substantive contents differ,
 - directory-only differences remain visible,
 - ignorable metadata remains visible,
-- and an otherwise-SAME verdict is qualified when structure or ignorable metadata differs.
+- and an otherwise-MATCH verdict is qualified when structure or ignorable metadata differs.
 
 ## 2. Inputs and Scope
 
@@ -88,7 +88,7 @@ A file difference may be:
 2. Recognized metadata that remains relevant.
 3. Recognized metadata that is safe to ignore for this comparison.
 
-Ignored metadata is never hidden from the report. It remains visible and counted as a detected difference, but it does not count as a relevant difference and does not cause the overall comparison to fail. It does qualify an otherwise-SAME verdict.
+Ignored metadata is never hidden from the report. It remains visible and counted as a detected difference, but it does not count as a relevant difference and does not cause the overall comparison to fail. It does qualify an otherwise-MATCH verdict.
 
 A file is not ignored merely because it:
 
@@ -231,6 +231,7 @@ Report requirements:
 - Empty difference classes do not need placeholder rows.
 - Metadata annotations appear in a final `Note` column.
 - Directory-summary rows write `DIR` in the `Type` column; ordinary file rows leave it blank.
+- Directory-summary rows use their own free-form summary text in place of the `LEFT size`/`RIGHT size` columns; only file rows populate those columns.
 - The report must distinguish detected differences from differences that affect the final result.
 
 ## 6. Recursive Comparison
@@ -612,7 +613,7 @@ LEFT contains `IMG_1003.JPG`; RIGHT does not.
 Expected:
 
 ```text
-<<  IMG_1003.JPG   <LEFT size>   <missing>
+<<        IMG_1003.JPG   <LEFT size>   <missing>
 ```
 
 The difference is relevant unless an explicit metadata rule says otherwise.
@@ -624,7 +625,7 @@ RIGHT contains `IMG_1004.JPG`; LEFT does not.
 Expected:
 
 ```text
->>  IMG_1004.JPG   <missing>   <RIGHT size>
+>>        IMG_1004.JPG   <missing>   <RIGHT size>
 ```
 
 The difference is relevant unless an explicit metadata rule says otherwise.
@@ -646,7 +647,7 @@ IMG_1005.JPG   5,238,105 bytes
 Expected:
 
 ```text
-<>  IMG_1005.JPG   5,238,104   5,238,105
+<>        IMG_1005.JPG   5,238,104   5,238,105
 ```
 
 This is one relevant difference.
