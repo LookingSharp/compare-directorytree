@@ -110,6 +110,44 @@ function Format-CDTByteCount {
     $Bytes.ToString('N0', [cultureinfo]::InvariantCulture)
 }
 
+function Format-CDTAggregateByteTotal {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [long] $Bytes
+    )
+
+    if ($Bytes -lt 1024) { return "$Bytes B" }
+
+    $units = @('KB', 'MB', 'GB', 'TB', 'PB')
+    $value = [double]$Bytes
+    $unitIndex = -1
+
+    while ($value -ge 1024 -and $unitIndex -lt ($units.Count - 1)) {
+        $value = $value / 1024
+        $unitIndex++
+    }
+
+    $rounded = [math]::Round($value, 1)
+    $text = $rounded.ToString('0.#', [cultureinfo]::InvariantCulture)
+
+    '{0} {1}' -f $text, $units[$unitIndex]
+}
+
+function Get-CDTPathSortKey {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Path
+    )
+
+    # A NUL separator makes an ordinal comparison of the joined key behave as a
+    # segment-by-segment comparison, because NUL sorts below every path character.
+    $segments = $Path.TrimEnd('\').Split('\')
+    ($segments | ForEach-Object { $_.ToLowerInvariant() }) -join "`0"
+}
+
 function Format-CDTCount {
     [CmdletBinding()]
     param(
@@ -226,6 +264,28 @@ function Get-CDTSubtreeStatistic {
     }
 }
 
+function Get-CDTEmptyLeafDirectoryCount {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [psobject] $Node,
+
+        [switch] $IncludeSelf
+    )
+
+    $count = 0
+
+    if ($IncludeSelf -and $Node.Files.Count -eq 0 -and $Node.Dirs.Count -eq 0) {
+        $count++
+    }
+
+    foreach ($child in $Node.Dirs.Values) {
+        $count += Get-CDTEmptyLeafDirectoryCount -Node $child -IncludeSelf
+    }
+
+    $count
+}
+
 function Get-CDTSubtreeFile {
     [CmdletBinding()]
     param(
@@ -262,10 +322,10 @@ function Format-CDTDirectorySummary {
         [psobject] $Statistic
     )
 
-    $text = '{0}, {1}, {2} B' -f
+    $text = '{0}, {1}, {2}' -f
         (Format-CDTCount -Count $Statistic.FileCount -Singular 'file' -Plural 'files'),
         (Format-CDTCount -Count $Statistic.DirectoryCount -Singular 'dir' -Plural 'dirs'),
-        (Format-CDTByteCount -Bytes $Statistic.ByteCount)
+        (Format-CDTAggregateByteTotal -Bytes $Statistic.ByteCount)
 
     if ($Statistic.IgnoredCount -gt 0) {
         $text += ' | ignored metadata {0}' -f $Statistic.IgnoredCount
@@ -302,7 +362,8 @@ function New-CDTFileRow {
 
     [pscustomobject]@{
         Class   = $Class
-        SortKey = $Path
+        SortKey = Get-CDTPathSortKey -Path $Path
+        Type    = ''
         IsDir   = $false
         Path    = $Path
         Left    = $leftText
@@ -317,20 +378,21 @@ function New-CDTDirectoryRow {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string] $Class,
-        [Parameter(Mandatory)][string] $DisplayPath,
+        [Parameter(Mandatory)][AllowEmptyString()][string] $RelativePath,
         [Parameter(Mandatory)][string] $Summary
     )
 
     [pscustomobject]@{
         Class   = $Class
-        SortKey = $DisplayPath
+        SortKey = Get-CDTPathSortKey -Path $RelativePath
+        Type    = 'DIR'
         IsDir   = $true
-        Path    = $DisplayPath
+        Path    = Format-CDTRelativeDirectoryPath -RelativePath $RelativePath
         Left    = ''
         Right   = ''
         Note    = ''
         Meta    = $null
-        Text    = '[DIR] {0}   {1}' -f $DisplayPath, $Summary
+        Text    = $Summary
     }
 }
 
@@ -356,9 +418,7 @@ function Add-CDTOneSidedSubtree {
 
     $Context.Stat.Ignored += $stat.IgnoredCount
 
-    if ($stat.FileCount -eq 0) {
-        $Context.Stat.EmptyDirectoryDifferences += $directoriesRepresented
-    }
+    $Context.Stat.EmptyDirectoryDifferences += Get-CDTEmptyLeafDirectoryCount -Node $Node -IncludeSelf
 
     foreach ($file in (Get-CDTSubtreeFile -Node $Node)) {
         $classification = Get-CDTMetadataClassification -FileName $file.Name
@@ -366,7 +426,7 @@ function Add-CDTOneSidedSubtree {
     }
 
     if ($Context.Mode -ne 'Expand' -or $stat.FileCount -eq 0) {
-        $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -DisplayPath (Format-CDTRelativeDirectoryPath -RelativePath $Node.RelativePath) -Summary (Format-CDTDirectorySummary -Statistic $stat))) | Out-Null
+        $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -RelativePath $Node.RelativePath -Summary (Format-CDTDirectorySummary -Statistic $stat))) | Out-Null
         return
     }
 
@@ -378,7 +438,7 @@ function Add-CDTOneSidedSubtree {
 
     foreach ($filelessDirectory in (Get-CDTFilelessDirectory -Node $Node)) {
         $filelessStat = Get-CDTSubtreeStatistic -Node $filelessDirectory
-        $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -DisplayPath (Format-CDTRelativeDirectoryPath -RelativePath $filelessDirectory.RelativePath) -Summary (Format-CDTDirectorySummary -Statistic $filelessStat))) | Out-Null
+        $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -RelativePath $filelessDirectory.RelativePath -Summary (Format-CDTDirectorySummary -Statistic $filelessStat))) | Out-Null
     }
 }
 
@@ -450,7 +510,7 @@ function Add-CDTDirectoryPair {
         if ($directRows.Count -gt 0) {
             $summary = '{0} same | << {1} | >> {2} | <> {3}' -f $directSame, $directLeftOnly, $directRightOnly, $directDifferent
             if ($directIgnored -gt 0) { $summary += ' | ignored {0}' -f $directIgnored }
-            $Context.Rows.Add((New-CDTDirectoryRow -Class '<>' -DisplayPath (Format-CDTRelativeDirectoryPath -RelativePath $Left.RelativePath) -Summary $summary)) | Out-Null
+            $Context.Rows.Add((New-CDTDirectoryRow -Class '<>' -RelativePath $Left.RelativePath -Summary $summary)) | Out-Null
         }
     }
     else {
@@ -501,12 +561,14 @@ function Format-CDTDifferenceRow {
         [Parameter(Mandatory)][int] $RightWidth
     )
 
+    $prefix = '{0}  {1}  ' -f $Row.Class, $Row.Type.PadRight(4)
+
     if ($Row.IsDir) {
-        return ('{0}  {1}' -f $Row.Class, $Row.Text).TrimEnd()
+        return ('{0}{1}{2}' -f $prefix, $Row.Path.PadRight($PathWidth), $Row.Text).TrimEnd()
     }
 
-    ('{0}  {1}{2}   {3}   {4}' -f
-        $Row.Class,
+    ('{0}{1}{2}   {3}   {4}' -f
+        $prefix,
         $Row.Path.PadRight($PathWidth),
         $Row.Left.PadLeft($LeftWidth),
         $Row.Right.PadLeft($RightWidth),
@@ -520,32 +582,42 @@ function Get-CDTVerdictLine {
     )
 
     $relevant = $Stat.TotalDifferences - $Stat.Ignored
+    $emptyDirectories = $Stat.EmptyDirectoryDifferences
+    $structural = $Stat.LeftOnlyDirectories + $Stat.RightOnlyDirectories
+    $nonEmptyDirectories = $structural - $emptyDirectories
 
     if ($relevant -gt 0) {
         $parts = @(Format-CDTCount -Count $relevant -Singular 'relevant difference' -Plural 'relevant differences')
-        if ($Stat.EmptyDirectoryDifferences -gt 0) {
-            $parts += Format-CDTCount -Count $Stat.EmptyDirectoryDifferences -Singular 'empty-subdirectory difference' -Plural 'empty-subdirectory differences'
+        if ($emptyDirectories -gt 0) {
+            $parts += Format-CDTCount -Count $emptyDirectories -Singular 'empty-subdirectory difference' -Plural 'empty-subdirectory differences'
+        }
+        if ($nonEmptyDirectories -gt 0) {
+            $parts += Format-CDTCount -Count $nonEmptyDirectories -Singular 'directory-structure difference' -Plural 'directory-structure differences'
         }
         if ($Stat.Ignored -gt 0) {
             $parts += Format-CDTCount -Count $Stat.Ignored -Singular 'ignored metadata difference' -Plural 'ignored metadata differences'
         }
-        return 'RESULT: NOT THE SAME - {0}' -f ($parts -join ' | ')
+        return 'RESULT: DIFFERENT - {0}' -f ($parts -join ' | ')
     }
 
-    $structureDiffers = $Stat.EmptyDirectoryDifferences -gt 0
-    $metadataDiffers = $Stat.Ignored -gt 0
+    $clauses = @()
+    if ($emptyDirectories -gt 0) { $clauses += 'different empty subdirectories' }
+    if ($nonEmptyDirectories -gt 0) { $clauses += 'directory structure differs' }
 
-    if ($structureDiffers -and $metadataDiffers) {
-        return 'RESULT: SAME - qualified: different empty subdirectories; other differences limited to ignorable metadata'
-    }
-    if ($structureDiffers) {
-        return 'RESULT: SAME - qualified: different empty subdirectories'
-    }
-    if ($metadataDiffers) {
-        return 'RESULT: SAME - qualified: differences limited to {0}' -f (Format-CDTCount -Count $Stat.Ignored -Singular 'ignored metadata file' -Plural 'ignored metadata files')
+    if ($Stat.Ignored -gt 0) {
+        if ($clauses.Count -gt 0) {
+            $clauses += 'other differences limited to ignorable metadata'
+        }
+        else {
+            $clauses += 'differences limited to {0}' -f (Format-CDTCount -Count $Stat.Ignored -Singular 'ignored metadata file' -Plural 'ignored metadata files')
+        }
     }
 
-    'RESULT: SAME - all {0} match' -f (Format-CDTCount -Count $Stat.Same -Singular 'file' -Plural 'files')
+    if ($clauses.Count -gt 0) {
+        return 'RESULT: MATCH - qualified: {0}' -f ($clauses -join '; ')
+    }
+
+    'RESULT: MATCH - all {0} match' -f (Format-CDTCount -Count $Stat.Same -Singular 'file' -Plural 'files')
 }
 
 function Add-CDTColor {
@@ -574,11 +646,11 @@ function Add-CDTColor {
             $colored = '{0}{1}{2}{3}' -f $colored.Substring(0, $ignoredIndex), "$esc[2m", $colored.Substring($ignoredIndex), $reset
         }
 
-        if ($text.StartsWith('RESULT: NOT THE SAME')) {
-            $colored = $colored.Replace('NOT THE SAME', "$esc[31mNOT THE SAME$reset")
+        if ($text.StartsWith('RESULT: DIFFERENT')) {
+            $colored = $colored -replace '^RESULT: DIFFERENT', "RESULT: $esc[31mDIFFERENT$reset"
         }
-        elseif ($text.StartsWith('RESULT: SAME')) {
-            $colored = $colored -replace '^RESULT: SAME', "RESULT: $esc[32mSAME$reset"
+        elseif ($text.StartsWith('RESULT: MATCH')) {
+            $colored = $colored -replace '^RESULT: MATCH', "RESULT: $esc[32mMATCH$reset"
         }
 
         $colored
@@ -684,18 +756,29 @@ function Compare-DirectoryTree {
     $stat.TotalDifferences = $stat.DifferentSize + $stat.LeftOnly + $stat.RightOnly
     $relevant = $stat.TotalDifferences - $stat.Ignored
 
+    $comparison = [System.Comparison[psobject]] {
+        param($a, $b)
+        [string]::CompareOrdinal($a.SortKey, $b.SortKey)
+    }
+
     $rows = @(
         foreach ($class in @('<<', '>>', '<>')) {
-            , @($context.Rows | Where-Object { $_.Class -eq $class } | Sort-Object -Property @{ Expression = { $_.SortKey.ToLowerInvariant() } })
+            $classRows = [System.Collections.Generic.List[psobject]]::new()
+            foreach ($row in $context.Rows) { if ($row.Class -eq $class) { $classRows.Add($row) | Out-Null } }
+            $classRows.Sort($comparison)
+            , @($classRows)
         }
     )
 
     $fileRows = @($context.Rows | Where-Object { -not $_.IsDir })
+    $hasDirectoryRow = @($context.Rows | Where-Object { $_.IsDir }).Count -gt 0
     $pathWidth = 38
     $leftWidth = 17
     $rightWidth = 18
-    foreach ($row in $fileRows) {
+    foreach ($row in $context.Rows) {
         if (($row.Path.Length + 2) -gt $pathWidth) { $pathWidth = $row.Path.Length + 2 }
+    }
+    foreach ($row in $fileRows) {
         if ($row.Left.Length -gt $leftWidth) { $leftWidth = $row.Left.Length }
         if ($row.Right.Length -gt $rightWidth) { $rightWidth = $row.Right.Length }
     }
@@ -712,15 +795,15 @@ function Compare-DirectoryTree {
 
     if ($Recurse) {
         $modeText = switch ($mode) {
-            'Compact' { 'compact directory summaries' }
-            'Expand'  { 'one-sided subtrees expanded file by file' }
-            default   { 'one-sided subtrees collapsed at the highest missing directory' }
+            'Compact' { 'compact' }
+            'Expand'  { 'expand missing subtrees' }
+            default   { 'default recursive mode' }
         }
-        & $add 'Scope : All files beneath these directories; subdirectories ARE searched.'
-        & $add '        Hidden and system files ARE included.'
+        & $add 'Scope : Files in these directories and all subdirectories.'
         & $add "        Presentation: $modeText."
-        & $add 'Match : Root-relative paths are compared case-insensitively.'
-        & $add 'Same  : Matching root-relative path and exact size in bytes.'
+        & $add '        Hidden and system files ARE included.'
+        & $add 'Match : Relative paths are compared case-insensitively.'
+        & $add 'Same  : Matching relative path and exact size in bytes.'
     }
     else {
         & $add 'Scope : Files in these directories only; subdirectories are NOT searched.'
@@ -745,9 +828,11 @@ function Compare-DirectoryTree {
 
     if ($Recurse) {
         & $add ''
+        & $add (Format-CDTSummaryLine -Label 'LEFT directories:' -Value $leftStat.DirectoryCount)
+        & $add (Format-CDTSummaryLine -Label 'RIGHT directories:' -Value $rightStat.DirectoryCount)
         & $add (Format-CDTSummaryLine -Label 'LEFT-only directories:' -Value $stat.LeftOnlyDirectories)
         & $add (Format-CDTSummaryLine -Label 'RIGHT-only directories:' -Value $stat.RightOnlyDirectories)
-        & $add (Format-CDTSummaryLine -Label 'Empty-subdirectory differences:' -Value $stat.EmptyDirectoryDifferences)
+        & $add (Format-CDTSummaryLine -Label 'Empty-directory differences:' -Value $stat.EmptyDirectoryDifferences)
     }
 
     & $add ''
@@ -755,18 +840,24 @@ function Compare-DirectoryTree {
     & $add (Format-CDTSummaryLine -Label 'Ignored metadata differences:' -Value $stat.Ignored)
     & $add (Format-CDTSummaryLine -Label 'Relevant differences:' -Value $relevant)
 
+    if ($Recurse) {
+        & $add (Format-CDTSummaryLine -Label 'Structural differences:' -Value ($stat.LeftOnlyDirectories + $stat.RightOnlyDirectories))
+    }
+
     if ($context.Rows.Count -gt 0) {
         & $add ''
         & $add 'DIFFERENCES'
         & $add '-----------'
         & $add ''
-        & $add ('    {0}{1}   {2}   {3}' -f
-            'File'.PadRight($pathWidth),
+        & $add ('    {0}  {1}{2}   {3}   {4}' -f
+            'Type',
+            'File / Directory'.PadRight($pathWidth),
             'LEFT size (bytes)'.PadLeft($leftWidth),
             'RIGHT size (bytes)'.PadLeft($rightWidth),
             'Note')
-        & $add ('    {0}{1}   {2}   {3}' -f
-            ('-' * 4).PadRight($pathWidth),
+        & $add ('    {0}  {1}{2}   {3}   {4}' -f
+            '----',
+            ('-' * 16).PadRight($pathWidth),
             ('-' * 17).PadLeft($leftWidth),
             ('-' * 18).PadLeft($rightWidth),
             '----')
@@ -783,14 +874,17 @@ function Compare-DirectoryTree {
 
         & $add ''
         & $add 'Legend:'
-        & $add '  <<  Exists only on LEFT'
-        & $add '  >>  Exists only on RIGHT'
-        if ($Recurse) {
-            & $add '  <>  Same relative path, different size'
+        if ($rows[0].Count -gt 0) { & $add '  <<   Exists only on LEFT' }
+        if ($rows[1].Count -gt 0) { & $add '  >>   Exists only on RIGHT' }
+        if ($rows[2].Count -gt 0) {
+            if ($Recurse) {
+                & $add '  <>   Same relative path, different size'
+            }
+            else {
+                & $add '  <>   Same filename, different size'
+            }
         }
-        else {
-            & $add '  <>  Same filename, different size'
-        }
+        if ($hasDirectoryRow) { & $add '  DIR  Directory summary row' }
     }
 
     & $add ''
