@@ -9,13 +9,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
-- Speclet `specs/speclets/recursive-comparison.md` describing recursive
-  comparison scope and presentation modes.
-- Speclet `specs/speclets/console-color-presentation.md` describing console
-  color presentation rules.
+- Specified recursive comparison (`-Recurse`) with the Default, `-Compact`,
+  and `-ExpandMissingSubtrees` presentation modes, directory-structure and
+  empty-directory reporting, missing-subtree collapse, and qualified SAME
+  verdicts.
+- Specified sparse console color presentation and the `-NoColor` switch.
 
 ### Changed
 
 - Replaced the placeholder authoritative specification
   `specs/Compare-DirectoryTree-Spec.md` with the working-draft Directory File
   Comparison Specification.
+- Merged the recursive-comparison and console-color-presentation speclets into
+  the authoritative specification and removed them from `specs/speclets/`.
+- Verdict lines are now single-line, consistent with the one-line
+  comparison-entry rule.
