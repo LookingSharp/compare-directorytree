@@ -115,6 +115,8 @@ Difference classes:
 <>  Same filename exists on both sides, but exact byte sizes differ
 ```
 
+Under `-Recurse`, `<>` compares the root-relative path rather than the bare filename.
+
 Display order is always:
 
 ```text
@@ -129,7 +131,7 @@ Within each class, entries are sorted deterministically.
 
 Ordering rules:
 
-- Entries are ordered by their root-relative path, compared segment by segment.
+- Entries are ordered by their root-relative path, compared segment by segment. Without `-Recurse` this path is simply the filename.
 - Each segment is compared using a case-insensitive ordinal comparison.
 - Directory-summary rows sort at their own directory path, so a directory row and the file rows sharing its parent interleave in one ordering rather than being grouped into separate directory and file blocks.
 - Because case-insensitive path collisions are an error (Section 9), no two entries in a class can compare equal.
@@ -231,7 +233,7 @@ When `-Recurse` is specified, the `Scope` line must describe the recursive scope
 Report requirements:
 
 - Use plain ASCII text.
-- Use thousands separators for byte sizes.
+- Use byte size formatting as defined in Section 5.3.
 - Use `<missing>` when a file is absent from one side.
 - Do not truncate filenames or paths to preserve column alignment.
 - Matching files are summarized by count and are not individually listed by default.
@@ -262,9 +264,9 @@ Two distinct byte presentations are used, and they must not be interchanged.
 Examples:
 
 ```text
-0 B
-81,920 bytes  -> 80 KB
-8,375,186,227 bytes -> 7.8 GB
+0             -> 0 B
+81,920        -> 80 KB
+8,375,186,227 -> 7.8 GB
 ```
 
 Abbreviated totals are deliberately approximate. They summarize a collapsed subtree for scanning; they are not comparison values, and no verdict depends on them.
@@ -300,6 +302,8 @@ Recursive entries are reported relative to the supplied roots:
 The first root remains LEFT and the second root remains RIGHT.
 
 `-Recurse` supports three mutually exclusive presentation modes.
+
+The row examples throughout this section illustrate row grammar and content. They are not column-alignment references; actual column positions are governed by Sections 5.2 and 5.3, and the canonical recursive layout is shown in Section 6.8.
 
 ### 6.1 Default recursive mode
 
@@ -505,7 +509,7 @@ Legend:
 RESULT: DIFFERENT - 216 relevant differences | 1 empty-subdirectory difference | 19 directory-structure differences | 2 ignored metadata differences
 ```
 
-In this example the LEFT `Camp\Raw\` subtree is collapsed into one row but contributes all 214 of its files to `LEFT only` and all 19 of its directories to `LEFT-only directories`, per Section 6.7. The `<<` class also shows the ordering rule of Section 5: `Camp\Empty\`, `Camp\IMG_1901.JPG`, `Camp\Raw\`, and `Camp\Thumbs.db` interleave by path rather than grouping directory rows separately.
+In this example the LEFT `Camp\Raw\` subtree is collapsed into one row but contributes all 214 of its files to `LEFT only` and all 19 of its directories to `LEFT-only directories`, per Section 6.7. The verdict's `1 empty-subdirectory difference` and `19 directory-structure differences` sum to the `Structural differences` counter of 20. The `<<` class also shows the ordering rule of Section 5: `Camp\Empty\`, `Camp\IMG_1901.JPG`, `Camp\Raw\`, and `Camp\Thumbs.db` interleave by path rather than grouping directory rows separately.
 
 The `Scope` line names the active presentation mode: `default recursive mode`, `compact`, or `expand missing subtrees`.
 
@@ -527,7 +531,7 @@ Directory summary counters:
 : One-sided directories that contain no files and no subdirectories. This is a subset of `LEFT-only directories` plus `RIGHT-only directories` and is reported separately for visibility, not added to them.
 
 `Structural differences`
-: `LEFT-only directories + RIGHT-only directories`.
+: `LEFT-only directories + RIGHT-only directories`. The verdict line reports this same population split into its empty and non-empty parts, per Section 8.1, so the verdict's `empty-subdirectory differences` and `directory-structure differences` sum to this counter.
 
 The directory block and the `Structural differences` line appear only under `-Recurse`.
 
@@ -665,8 +669,10 @@ Segments appear in this fixed order:
 
 1. `<n> relevant difference` / `<n> relevant differences` - always present.
 2. `<n> empty-subdirectory difference` / `<n> empty-subdirectory differences` - omitted when zero.
-3. `<n> directory-structure difference` / `<n> directory-structure differences` - omitted when zero; counts one-sided directories that are not empty-directory differences.
+3. `<n> directory-structure difference` / `<n> directory-structure differences` - omitted when zero.
 4. `<n> ignored metadata difference` / `<n> ignored metadata differences` - omitted when zero.
+
+Segments 2 and 3 partition the summary counter `Structural differences` (Section 6.8): one-sided directories that are empty are counted by segment 2, and all other one-sided directories are counted by segment 3. Neither segment alone equals `Structural differences`, and the two segments together always do. This split exists because an empty one-sided directory is the case a reader is most likely to overlook, so it is named explicitly rather than folded into a single structural total.
 
 `Relevant differences` equal to zero produces `MATCH`. When nothing else differs:
 
@@ -991,6 +997,7 @@ The report implementation must demonstrate at least these behaviors:
 10. Structural differences do not change `Total differences`, `Ignored metadata differences`, or `Relevant differences`.
 11. Verdict segments and qualification clauses appear in the fixed order of Section 8.1, and zero-valued ones are omitted rather than printed as `0`.
 12. Verdict counts use singular nouns when the count is one.
+13. The verdict's `empty-subdirectory differences` and `directory-structure differences` sum to the `Structural differences` summary counter.
 
 ## 11. Out of Scope
 
@@ -1121,5 +1128,5 @@ Implementation technique is intentionally not prescribed. The delivered behavior
 36. Directory-summary byte totals are abbreviated; file size columns are never abbreviated.
 37. Under `-Recurse`, the summary reports directory counters and `Structural differences`; these never alter the file-difference counters or the verdict rule.
 38. `Empty-directory differences` is a subset callout and is not added into `Structural differences`.
-39. Verdict segments and qualification clauses use the fixed order and zero-omission rules of Section 8.1.
+39. Verdict segments and qualification clauses use the fixed order and zero-omission rules of Section 8.1, and the two structural segments sum to `Structural differences`.
 40. The legend reflects the active mode and lists only markers the report actually uses.
