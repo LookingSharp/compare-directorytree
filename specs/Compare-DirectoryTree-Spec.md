@@ -260,7 +260,7 @@ Summarize differences by directory instead of listing individual differing files
 - A shared directory with direct file differences produces one `[DIR]` summary row.
 - The summary counts files directly in that directory; descendant directories with differences receive their own rows.
 - This preserves the location of differences rather than allowing a high-level directory to swallow all descendant detail.
-- Fully one-sided subtrees remain collapsed at the highest missing directory, as in the default mode, using the Section 6.5 grammar rather than the direct-file grammar below.
+- Fully one-sided subtrees remain collapsed at the highest missing directory, as in the default mode, using the Section 6.4 collapsed-summary grammar rather than the direct-file grammar below.
 - Empty-directory differences remain explicit.
 
 Shared-directory grammar:
