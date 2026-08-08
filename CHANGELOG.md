@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- PowerShell implementation of `Compare-DirectoryTree` in
+  `powershell/Compare-DirectoryTree.ps1`, covering the report model, metadata
+  catalog and policy, summary and verdict semantics, error and ambiguity
+  handling, `-Recurse` with all three presentation modes, `-ExplainMetadata`,
+  and console color with `-NoColor`.
+- Pester validation tests in `powershell/tests/Compare-DirectoryTree.Tests.ps1`
+  covering the Section 10 acceptance scenarios and the Appendix B invariants.
 - Specified recursive comparison (`-Recurse`) with the Default, `-Compact`,
   and `-ExpandMissingSubtrees` presentation modes, directory-structure and
   empty-directory reporting, missing-subtree collapse, and qualified SAME
