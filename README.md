@@ -21,3 +21,9 @@ as focused documents under [`specs/speclets/`](specs/speclets/).
 
 See [`CHANGELOG.md`](CHANGELOG.md) for a curated history of notable changes.
 Releases of this project use [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Review team and agent policy
+
+[`TEAM.md`](TEAM.md) defines the review team applied to specification and
+design changes. [`AGENTS.md`](AGENTS.md) is the repository policy for
+coding agents.
