@@ -24,7 +24,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the authoritative specification and removed them from `specs/speclets/`.
 - Verdict lines are now single-line, consistent with the one-line
   comparison-entry rule.
-- Proposed (speclet, not yet merged into the authoritative specification):
-  replace the `SAME` / `NOT THE SAME` verdict pair with `MATCH` / `DIFFERENT`,
-  and replace the inline `[DIR]` name prefix with a dedicated `Type` column.
-  See `specs/speclets/report-verdict-and-type-column.md`.
+- **Breaking:** the report verdict pair is now `RESULT: MATCH` /
+  `RESULT: DIFFERENT` instead of `RESULT: SAME` / `RESULT: NOT THE SAME`, so an
+  exact search for the positive verdict cannot also match the negative one. The
+  per-file `Same` counter, the `Same  :` header rule line, and the `-Compact`
+  `<same> same` counts are unchanged.
+- **Breaking:** directory-summary rows no longer carry an inline `[DIR]` name
+  prefix. A narrow `Type` column now holds `DIR`, and ordinary file rows leave
+  it blank, so directory paths and file paths begin in the same column. The
+  differences table header is now `Type` / `File / Directory`.
+- Merged the report verdict/Type-column speclet into the authoritative
+  specification and removed it from `specs/speclets/`.
