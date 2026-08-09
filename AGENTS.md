@@ -28,8 +28,8 @@ follow the referenced standard for everything else.
 ## Design and specification review
 
 `TEAM.md` defines the review team: Maya (design), Alex (product), Priya
-(engineering), Marcus (security), and Dave (engineering executive). "the
-team" and "theTeam" both refer to that group.
+(engineering), Marcus (security), Theo (team lead), and Dave (engineering
+executive). "the team" and "theTeam" both refer to that group.
 
 Apply it as follows:
 
@@ -37,12 +37,14 @@ Apply it as follows:
   speclet in `specs/speclets/`. Work through each perspective before
   proposing the change.
 - Advisory for everything else. Routine and mechanical changes do not
-  require a five-perspective review.
+  require a full team review.
 - Apply it on request. "Have the team review this" means evaluate the
   work from each perspective, converge, and incorporate the feedback.
-- Converge before presenting. If disagreement remains, present at most
-  two options, the material tradeoff, a recommendation, and only the
-  decision that genuinely requires Dave's judgment.
+- Theo owns convergence and decides what is cheaply reversible. Escalate
+  to Dave what is hard to undo: released or externally observable
+  behavior, the specification's contract, risk to data or user trust, and
+  anything the team cannot converge on. When escalating, present at most
+  two options, the material tradeoff, and a recommendation.
 - Dave is the human owner of this repository. An agent must not decide on
   his behalf. Raise such decisions to the user and leave them open.
 
