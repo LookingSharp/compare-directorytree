@@ -175,6 +175,8 @@ Not:
 
 The fixed explanatory header block at the top of the report (`Scope`, `Match`, `Same`, `Ignore`, `Note`) is not a comparison entry and may occupy multiple lines.
 
+This rule holds for every report the tool emits, because a name that could break it - one containing an ASCII control character - is rejected before any report is produced (Section 9).
+
 ### 5.2 Canonical format
 
 ```text
@@ -783,6 +785,31 @@ img_1001.jpg
 
 If such a collision exists within either directory, the comparison is ambiguous and must fail clearly rather than selecting an arbitrary match. Under `-Recurse`, the same rule applies to colliding directory names within a directory.
 
+### Control characters in names
+
+Some filesystems permit ASCII control characters (`0x00`-`0x1F` and `0x7F`) in a file or directory name. Such a name cannot be rendered safely:
+
+- A raw ESC (`0x1B`) lets the name emit arbitrary terminal control sequences into the report, including a forged `RESULT: MATCH` line, so the name can misstate the tool's own verdict.
+- A raw newline or carriage return splits a comparison entry across physical lines, violating Section 5.1, and can forge additional rows.
+
+A name containing these characters has no legitimate use; its presence indicates either corruption or a deliberate attempt to manipulate the report. Such a name is not trustworthy enough to render, and repairing it would make the displayed name differ from the actual name, so the comparison fails clearly instead.
+
+The rule:
+
+- If either supplied path, or any in-scope file or directory name, contains a character in `0x00`-`0x1F` or `0x7F`, the comparison fails and no normal comparison result is produced.
+- Only names in the compared scope are examined. Without `-Recurse`, subdirectory names are not in scope.
+- The failure names the affected side (LEFT or RIGHT) and identifies the offending file or directory by its root-relative path, the same way a difference row identifies a file, so the reader can act on the specific object rather than being told only that the tree is unsafe. It also states an offending character.
+- The offending name is written with every control character it contains replaced by `<0xHH>`, using two uppercase hexadecimal digits. No output may reproduce the raw character, because doing so would perform the very injection this rule prevents.
+- An implementation may stop at the first offending name rather than reporting all of them.
+
+A LEFT file named `IMG_1901<ESC>[32m.JPG`, where `<ESC>` is a literal `0x1B` byte, produces a failure of this form:
+
+```text
+Illegal name on LEFT: 'IMG_1901<0x1B>[32m.JPG' contains ASCII control character 0x1B
+```
+
+Only these code points are rejected. The C1 range (`U+0080`-`U+009F`) is deliberately allowed: legacy code-page mojibake places those code points in otherwise ordinary names, they cannot break the one-line rule of Section 5.1, and mainstream terminals do not act on them when they arrive as UTF-8. Rejecting them would fail real comparisons for negligible benefit.
+
 ### Files changing during comparison
 
 The tool does not promise filesystem snapshot semantics. The compared directories are expected to be reasonably stable during the operation.
@@ -1014,6 +1041,18 @@ The report implementation must demonstrate at least these behaviors:
 12. Verdict counts use singular nouns when the count is one.
 13. The verdict's `empty-subdirectory differences` and `directory-structure differences` sum to the `Structural differences` summary counter.
 
+### 10.17 Control character in a name
+
+A file in one tree is named `IMG_1901<ESC>[32m.JPG`, where `<ESC>` is a literal `0x1B` byte.
+
+Expected:
+
+- No normal comparison result.
+- A clear error names the affected side, identifies the offending file by its root-relative path with `<0x1B>` in place of the control character, and states the offending character.
+- No output contains the raw control character.
+- The same outcome applies to an in-scope directory name under `-Recurse`, and to a supplied path.
+- A name containing a C1 code point such as `U+0092`, but no ASCII control character, is compared normally.
+
 ## 11. Out of Scope
 
 The utility does not:
@@ -1026,6 +1065,7 @@ The utility does not:
 - determine whether two entries refer to the same hard-link target,
 - establish semantic equivalence of symbolic/reparse-point targets,
 - perform Unicode normalization beyond the filename comparison behavior selected by the implementation,
+- compare, escape, or otherwise repair names containing ASCII control characters, which are rejected instead (Section 9),
 - provide filesystem snapshot or transactional consistency,
 - modify, copy, delete, or synchronize files,
 - automatically ignore unknown metadata-like files.
@@ -1145,3 +1185,5 @@ Implementation technique is intentionally not prescribed. The delivered behavior
 38. `Empty-directory differences` is a subset callout and is not added into `Structural differences`.
 39. Verdict segments and qualification clauses use the fixed order and zero-omission rules of Section 8.1, and the two structural segments sum to `Structural differences`.
 40. When the report contains at least one file or directory-summary difference row, its legend always lists `<<`, `>>`, and `<>`, in that order, and lists `DIR` only when a directory-summary row is present; when there are no such rows, the entire `DIFFERENCES` section is omitted.
+41. A supplied path or in-scope file or directory name containing an ASCII control character (`0x00`-`0x1F`, `0x7F`) produces a clear error that names the affected side and identifies the offending entry by its root-relative path, and produces no normal comparison result. C1 code points (`U+0080`-`U+009F`) are not rejected.
+42. No output ever contains a raw ASCII control character originating from a name; control characters in a rejected name are escaped as `<0xHH>`.

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- Specified and implemented rejection of file, directory, and supplied paths
+  containing an ASCII control character (`0x00`-`0x1F`, `0x7F`). Such a name can
+  inject terminal control sequences into the report - including a forged verdict
+  line - or split a comparison entry across physical lines, and has no
+  legitimate use, so the comparison now fails clearly. The failure names the
+  affected side and the offending name with each control character escaped as
+  `<0xHH>`, and never reproduces the raw character. C1 code points
+  (`U+0080`-`U+009F`) remain accepted. Resolves issue #9.
 - PowerShell implementation of `Compare-DirectoryTree` in
   `powershell/Compare-DirectoryTree.ps1`, covering the report model, metadata
   catalog and policy, summary and verdict semantics, error and ambiguity
