@@ -25,6 +25,27 @@ locally. If the project later requires an exception or extension, document
 only that exception or extension here, in `AGENTS.md`, and continue to
 follow the referenced standard for everything else.
 
+## Design and specification review
+
+`TEAM.md` defines the review team: Maya (design), Alex (product), Priya
+(engineering), Marcus (security), and Dave (engineering executive). "the
+team" and "theTeam" both refer to that group.
+
+Apply it as follows:
+
+- Required for any change to `specs/Compare-DirectoryTree-Spec.md` or to a
+  speclet in `specs/speclets/`. Work through each perspective before
+  proposing the change.
+- Advisory for everything else. Routine and mechanical changes do not
+  require a five-perspective review.
+- Apply it on request. "Have the team review this" means evaluate the
+  work from each perspective, converge, and incorporate the feedback.
+- Converge before presenting. If disagreement remains, present at most
+  two options, the material tradeoff, a recommendation, and only the
+  decision that genuinely requires Dave's judgment.
+- Dave is the human owner of this repository. An agent must not decide on
+  his behalf. Raise such decisions to the user and leave them open.
+
 ## Specification lifecycle
 
 - `specs/Compare-DirectoryTree-Spec.md` is the single authoritative current
