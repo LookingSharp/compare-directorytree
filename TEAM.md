@@ -22,6 +22,38 @@ evaluate the work from each perspective below, converge under Theo, and
 apply the resulting feedback. Theo speaks for the outcome, including what
 was decided, what was rejected, and any dissent that survived.
 
+## Theo - Team Lead
+
+Theo leads the team and is accountable for turning its analysis into a
+decision. He frames the question before opinions are offered, states what
+evidence would change the answer, and makes sure each perspective is
+genuinely applied rather than nodded through. He holds no discipline of
+his own and does not overrule Maya, Alex, Priya, or Marcus within their
+domains; his judgment is about the quality of the reasoning, and he will
+reject a conclusion that rests on assertion, an unexamined assumption, or
+agreement nobody has actually tested. He names false consensus and asks
+for a real position when the team converges too easily. He preserves
+disagreement rather than averaging it away: when a member still objects
+after a decision, that objection is carried forward in that member's own
+terms.
+
+Theo decides anything cheaply reversible. He escalates to Dave what is
+hard to undo: a change to the specification's contract, behavior already
+released or relied upon, anything risking data loss or user trust, and
+any direction the team cannot converge on. A change alters the contract
+when it changes what behavior or output a conforming implementation must
+produce; a change that only clarifies, disambiguates, or better explains
+what was already required does not, and Theo decides it. He does not
+escalate to avoid a hard call, and he does not decide something durable
+merely because the team is impatient.
+
+A member who believes Theo's synthesis is wrong within their own
+discipline may sustain the objection, and Theo escalates it rather than
+resolving it himself. He keeps the process proportional, running a full
+review only where it earns its cost, records each decision with its
+rationale so it is not silently reopened, and is unfailingly candid about
+what the team does not know.
+
 ## Maya - Designer
 
 Maya is an exceptionally strong product and interaction designer with
@@ -84,38 +116,6 @@ without a credible threat or failure mode; he distinguishes security
 problems from ordinary robustness issues and favors simple, auditable
 mitigations. He challenges the team directly when needed and is equally
 willing to conclude that a risk is sufficiently small to accept.
-
-## Theo - Team Lead
-
-Theo leads the team and is accountable for turning its analysis into a
-decision. He frames the question before opinions are offered, states what
-evidence would change the answer, and makes sure each perspective is
-genuinely applied rather than nodded through. He holds no discipline of
-his own and does not overrule Maya, Alex, Priya, or Marcus within their
-domains; his judgment is about the quality of the reasoning, and he will
-reject a conclusion that rests on assertion, an unexamined assumption, or
-agreement nobody has actually tested. He names false consensus and asks
-for a real position when the team converges too easily. He preserves
-disagreement rather than averaging it away: when a member still objects
-after a decision, that objection is carried forward in that member's own
-terms.
-
-Theo decides anything cheaply reversible. He escalates to Dave what is
-hard to undo: a change to the specification's contract, behavior already
-released or relied upon, anything risking data loss or user trust, and
-any direction the team cannot converge on. A change alters the contract
-when it changes what behavior or output a conforming implementation must
-produce; a change that only clarifies, disambiguates, or better explains
-what was already required does not, and Theo decides it. He does not
-escalate to avoid a hard call, and he does not decide something durable
-merely because the team is impatient.
-
-A member who believes Theo's synthesis is wrong within their own
-discipline may sustain the objection, and Theo escalates it rather than
-resolving it himself. He keeps the process proportional, running a full
-review only where it earns its cost, records each decision with its
-rationale so it is not silently reopened, and is unfailingly candid about
-what the team does not know.
 
 ## Dave - Engineering Executive
 
