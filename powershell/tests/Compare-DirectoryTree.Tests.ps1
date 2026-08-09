@@ -65,8 +65,9 @@ BeforeAll {
         )
 
         $Report |
-            Where-Object { $_ -match '^(<<|>>|<>)\s' -and $_ -like $Match } |
-            ForEach-Object { ($_ -replace '\s+', ' ').Trim() }
+            Where-Object { $_ -match '^(<<|>>|<>)\s' } |
+            ForEach-Object { ($_ -replace '\s+', ' ').Trim() } |
+            Where-Object { $_ -like $Match }
     }
 
     function Get-FileSystemSnapshot {
@@ -618,6 +619,24 @@ Describe 'Compare-DirectoryTree' {
             $withDir | Should -Contain '  DIR  Directory summary row'
         }
 
+        It 'always lists the three difference markers even when a class has no rows' {
+            New-TestFile (Join-Path $Left 'only-left.txt') 1
+            $report = Compare-DirectoryTree $Left $Right -NoColor
+
+            Get-DifferenceRow $report | Should -Not -Match '^(>>|<>)'
+            $report | Should -Contain '  <<   Exists only on LEFT'
+            $report | Should -Contain '  >>   Exists only on RIGHT'
+            $report | Should -Contain '  <>   Same filename, different size'
+        }
+
+        It 'omits the DIFFERENCES section entirely when there are no difference rows' {
+            $report = Compare-DirectoryTree $Left $Right -Recurse -NoColor
+
+            $report | Should -Not -Contain 'DIFFERENCES'
+            $report | Should -Not -Contain 'Legend:'
+            $report | Where-Object { $_ -like '*File / Directory*' } | Should -BeNullOrEmpty
+        }
+
         It 'switches the legend wording for the difference marker with -Recurse' {
             New-TestFile (Join-Path $Left 'diff.txt') 1
             New-TestFile (Join-Path $Right 'diff.txt') 2
@@ -800,15 +819,26 @@ Describe 'Compare-DirectoryTree' {
         }
 
         It 'reports empty descendant directories explicitly with -ExpandMissingSubtrees' {
+            New-TestFile (Join-Path $Left 'Raw\top.jpg') 100
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Raw\X\Y'), (Join-Path $Left 'Raw\X\Z') -Force | Out-Null
+
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor))
 
-            Get-CollapsedRow $rows '*Empty\*' | Should -Be '<< DIR Empty\ 0 files, 1 dir, 0 B'
+            Get-CollapsedRow $rows '*Raw\X\Y\*' | Should -Be '<< DIR Raw\X\Y\ 0 files, 0 dirs, 0 B'
+            Get-CollapsedRow $rows '*Raw\X\Z\*' | Should -Be '<< DIR Raw\X\Z\ 0 files, 0 dirs, 0 B'
+            Get-CollapsedRow $rows '*DIR Empty\Deep\*' | Should -Be '<< DIR Empty\Deep\ 0 files, 0 dirs, 0 B'
         }
 
-        It 'does not emit redundant non-empty ancestor rows with -ExpandMissingSubtrees' {
+        It 'does not emit container or ancestor rows with -ExpandMissingSubtrees' {
+            New-TestFile (Join-Path $Left 'Raw\top.jpg') 100
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Raw\X\Y') -Force | Out-Null
+
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor))
 
-            Get-CollapsedRow $rows '*DIR Missing\*' | Should -BeNullOrEmpty
+            Get-CollapsedRow $rows '<< DIR Missing\' | Should -BeNullOrEmpty
+            Get-CollapsedRow $rows '<< DIR Raw\' | Should -BeNullOrEmpty
+            Get-CollapsedRow $rows '<< DIR Raw\X\' | Should -BeNullOrEmpty
+            Get-CollapsedRow $rows '<< DIR Empty\' | Should -BeNullOrEmpty
         }
 
         It 'keeps summary counts identical across recursive presentation modes' {
@@ -816,9 +846,9 @@ Describe 'Compare-DirectoryTree' {
             $compact = Compare-DirectoryTree $Left $Right -Recurse -Compact -NoColor
             $expanded = Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor
 
-            foreach ($label in @('LEFT files:', 'RIGHT files:', 'Same:', 'Different size:', 'LEFT only:', 'RIGHT only:', 'Total differences:', 'Ignored metadata differences:', 'Relevant differences:', 'Empty-directory differences:')) {
-                Get-SummaryValue $compact $label | Should -Be (Get-SummaryValue $default $label)
-                Get-SummaryValue $expanded $label | Should -Be (Get-SummaryValue $default $label)
+            foreach ($label in @('LEFT files:', 'RIGHT files:', 'Same:', 'Different size:', 'LEFT only:', 'RIGHT only:', 'LEFT directories:', 'RIGHT directories:', 'LEFT-only directories:', 'RIGHT-only directories:', 'Empty-directory differences:', 'Total differences:', 'Ignored metadata differences:', 'Relevant differences:', 'Structural differences:')) {
+                Get-SummaryValue $compact $label | Should -Be (Get-SummaryValue $default $label) -Because "$label must not depend on presentation mode"
+                Get-SummaryValue $expanded $label | Should -Be (Get-SummaryValue $default $label) -Because "$label must not depend on presentation mode"
             }
 
             Get-VerdictLine $compact | Should -Be (Get-VerdictLine $default)

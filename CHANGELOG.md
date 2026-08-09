@@ -36,6 +36,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- Clarified Section 5.4 and Appendix B invariant 40: the legend always lists
+  `<<`, `>>`, and `<>` whenever the `DIFFERENCES` section appears, `DIR` is
+  listed only when a directory-summary row is present, and the whole
+  `DIFFERENCES` section is omitted when there are no difference rows.
+  Resolves the ambiguity tracked in issue #8.
+- Clarified Section 6.2: the compared roots produce a `-Compact` summary row
+  when they have direct file differences, and the empty root-relative path is
+  rendered as `.\`.
+- Clarified Section 6.3 and Section 10.13 items 14 and 15:
+  `-ExpandMissingSubtrees` emits a `DIR` row for every truly empty descendant
+  directory (no files and no child directories) and traverses fileless
+  container directories rather than collapsing them.
+- Corrected the Section 5.2 canonical example, whose `<>` rows were listed in
+  an order that contradicted the Section 5 ordering rule.
+
 - Replaced the placeholder authoritative specification
   `specs/Compare-DirectoryTree-Spec.md` with the working-draft Directory File
   Comparison Specification.
