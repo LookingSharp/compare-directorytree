@@ -297,7 +297,7 @@ function Get-CDTSubtreeFile {
     foreach ($child in $Node.Dirs.Values) { Get-CDTSubtreeFile -Node $child }
 }
 
-function Get-CDTFilelessDirectory {
+function Get-CDTEmptyLeafDirectory {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -305,12 +305,11 @@ function Get-CDTFilelessDirectory {
     )
 
     foreach ($child in $Node.Dirs.Values) {
-        $stat = Get-CDTSubtreeStatistic -Node $child
-        if ($stat.FileCount -eq 0) {
+        if ($child.Files.Count -eq 0 -and $child.Dirs.Count -eq 0) {
             $child
         }
         else {
-            Get-CDTFilelessDirectory -Node $child
+            Get-CDTEmptyLeafDirectory -Node $child
         }
     }
 }
@@ -425,7 +424,7 @@ function Add-CDTOneSidedSubtree {
         if ($classification) { $Context.EncounteredMetadata[$classification.Id] = $classification }
     }
 
-    if ($Context.Mode -ne 'Expand' -or $stat.FileCount -eq 0) {
+    if ($Context.Mode -ne 'Expand') {
         $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -RelativePath $Node.RelativePath -Summary (Format-CDTDirectorySummary -Statistic $stat))) | Out-Null
         return
     }
@@ -436,9 +435,11 @@ function Add-CDTOneSidedSubtree {
         $Context.Rows.Add((New-CDTFileRow -Class $Class -Path $file.RelativePath -FileName $file.Name -LeftSize $left -RightSize $right)) | Out-Null
     }
 
-    foreach ($filelessDirectory in (Get-CDTFilelessDirectory -Node $Node)) {
-        $filelessStat = Get-CDTSubtreeStatistic -Node $filelessDirectory
-        $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -RelativePath $filelessDirectory.RelativePath -Summary (Format-CDTDirectorySummary -Statistic $filelessStat))) | Out-Null
+    $emptyLeaves = if ($Node.Files.Count -eq 0 -and $Node.Dirs.Count -eq 0) { @($Node) } else { @(Get-CDTEmptyLeafDirectory -Node $Node) }
+
+    foreach ($emptyDirectory in $emptyLeaves) {
+        $emptyStat = Get-CDTSubtreeStatistic -Node $emptyDirectory
+        $Context.Rows.Add((New-CDTDirectoryRow -Class $Class -RelativePath $emptyDirectory.RelativePath -Summary (Format-CDTDirectorySummary -Statistic $emptyStat))) | Out-Null
     }
 }
 
@@ -874,15 +875,13 @@ function Compare-DirectoryTree {
 
         & $add ''
         & $add 'Legend:'
-        if ($rows[0].Count -gt 0) { & $add '  <<   Exists only on LEFT' }
-        if ($rows[1].Count -gt 0) { & $add '  >>   Exists only on RIGHT' }
-        if ($rows[2].Count -gt 0) {
-            if ($Recurse) {
-                & $add '  <>   Same relative path, different size'
-            }
-            else {
-                & $add '  <>   Same filename, different size'
-            }
+        & $add '  <<   Exists only on LEFT'
+        & $add '  >>   Exists only on RIGHT'
+        if ($Recurse) {
+            & $add '  <>   Same relative path, different size'
+        }
+        else {
+            & $add '  <>   Same filename, different size'
         }
         if ($hasDirectoryRow) { & $add '  DIR  Directory summary row' }
     }
