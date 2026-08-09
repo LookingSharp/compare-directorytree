@@ -217,8 +217,8 @@ DIFFERENCES
 
 >>        IMG_1842-edited.jpg                           <missing>            4,790,441
 
-<>        IMG_1842.JPG                                  4,821,334            4,817,902
 <>        .DS_Store                                         6,148                8,196   Ignored: macOS Finder metadata
+<>        IMG_1842.JPG                                  4,821,334            4,817,902
 
 Legend:
   <<   Exists only on LEFT
@@ -273,7 +273,7 @@ Abbreviated totals are deliberately approximate. They summarize a collapsed subt
 
 ### 5.4 Legend
 
-The legend describes the difference markers actually used by the report:
+The legend describes the difference markers used by the report. When the report contains at least one file or directory-summary difference row, the `DIFFERENCES` section ends with this legend:
 
 ```text
 Legend:
@@ -283,9 +283,13 @@ Legend:
   DIR  Directory summary row
 ```
 
+The `<<`, `>>`, and `<>` lines are always included, in that order, even when one or more of those difference classes contain no rows. These three markers are the report's stable vocabulary, so a reader learns one legend rather than re-reading a block whose shape changes from run to run.
+
 The `<>` line reads `Same filename, different size` by default, and `Same relative path, different size` when `-Recurse` is specified.
 
-The `DIR` line is included only when the report contains at least one directory-summary row.
+The `DIR` line is included only when the report contains at least one directory-summary row. `DIR` is a row-type qualifier rather than a difference class, and it is available only under `-Recurse`, so naming it in a report that contains no such row would introduce an unexplained concept.
+
+When the report contains no file or directory-summary difference rows, the entire `DIFFERENCES` section is omitted, including its heading, table header, and legend.
 
 The legend does not describe color (Section 7.6).
 
@@ -348,23 +352,34 @@ A Compact `DIR` row is shown only when that directory has:
 
 A directory containing only matching direct files and whose descendant differences are reported elsewhere does not need its own row.
 
+The compared roots together constitute the shared root directory for reporting. When that directory meets the Compact row criteria above, it produces one Compact `DIR` row; its direct file differences are not emitted as individual file rows.
+
+The root directory has an empty root-relative path. For display, render that path as `.\`:
+
+```text
+<>  DIR   .\                                    0 same | << 1 | >> 0 | <> 0
+```
+
+The `.\` token denotes the compared roots named by the `LEFT` and `RIGHT` report headers. It is a display token only; the root-relative path remains empty for matching and ordering.
+
 ### 6.3 `-ExpandMissingSubtrees`
 
 Use normal file-level reporting even inside directories that exist on only one side.
 
-- A one-sided subtree is traversed instead of represented by one collapsed summary row.
+- A one-sided subtree is traversed recursively instead of represented by one collapsed summary row.
 - Descendant files are reported individually with their root-relative paths.
-- Empty descendant directories are reported explicitly as `DIR` rows, because they otherwise have no visible descendant entry.
-- Non-empty container directories are not redundantly listed when their contents make their existence evident; do not emit summary `DIR` rows for non-empty ancestor directories merely to restate that the subtree is missing.
+- A descendant directory containing no files and no child directories is reported explicitly as a `DIR` row, because it otherwise has no visible descendant entry.
+- A directory containing one or more child directories is a container directory even when it contains no files. Continue traversing it; do not collapse it or emit a summary row merely because it is fileless.
+- Container and ancestor directories are not redundantly listed when descendant file rows or empty-directory rows make their existence evident.
 - Metadata annotations use the normal file-note policy.
 - Shared directories behave as in the default recursive mode.
 
 Example:
 
 ```text
+<<  DIR   2018\Camp\Raw\Empty\             0 files, 0 dirs, 0 B
 <<        2018\Camp\Raw\IMG_1001.JPG             5,238,104        <missing>
 <<        2018\Camp\Raw\Nested\IMG_1002.JPG      4,921,772        <missing>
-<<  DIR   2018\Camp\Raw\Empty\             0 files, 0 dirs, 0 B
 ```
 
 This mode is intentionally verbose and is intended for cases where the user wants the full inventory of a missing subtree.
@@ -941,8 +956,8 @@ The recursive implementation must demonstrate at least these behaviors:
 11. Compact counts do not recursively double-count files already represented by descendant directory rows.
 12. Compact mode retains collapsed one-sided subtree behavior.
 13. `-ExpandMissingSubtrees` reports descendant files from one-sided subtrees individually.
-14. `-ExpandMissingSubtrees` reports empty descendant directories explicitly.
-15. `-ExpandMissingSubtrees` does not redundantly emit non-empty ancestor directory rows in addition to their expanded contents.
+14. `-ExpandMissingSubtrees` reports every truly empty descendant directory - one containing no files and no child directories - as an explicit `DIR` row.
+15. `-ExpandMissingSubtrees` traverses fileless container directories to expose their descendants, but does not redundantly emit container or ancestor `DIR` rows when descendant file or empty-directory rows make their existence evident.
 16. Summary counts reflect actual represented files/directories rather than merely displayed rows.
 17. A MATCH verdict is qualified whenever directory structure differs or file differences consist only of ignored metadata.
 18. `-Compact` and `-ExpandMissingSubtrees` cannot be combined.
@@ -990,8 +1005,8 @@ The report implementation must demonstrate at least these behaviors:
 3. A directory-summary row's text begins in the `LEFT size (bytes)` column.
 4. Within a difference class, a directory row and file rows sharing its parent interleave in one path ordering rather than forming separate blocks.
 5. Ordering is stable across runs and independent of filesystem enumeration order.
-6. The legend `<>` line reads `Same filename, different size` without `-Recurse` and `Same relative path, different size` with `-Recurse`.
-7. The legend includes the `DIR` line only when the report contains a directory-summary row.
+6. A report with at least one file or directory-summary difference row includes the `DIFFERENCES` section and a legend that always lists `<<`, `>>`, and `<>`, in that order; a report with no such rows omits the entire section, including its heading, table header, and legend. The legend `<>` line reads `Same filename, different size` without `-Recurse` and `Same relative path, different size` with `-Recurse`.
+7. The legend includes the `DIR` line after the `<>` line only when the report contains at least one directory-summary row.
 8. A recursive report's `SUMMARY` includes the directory block and `Structural differences`; a non-recursive report includes neither.
 9. `Empty-directory differences` is not added into `Structural differences`.
 10. Structural differences do not change `Total differences`, `Ignored metadata differences`, or `Relevant differences`.
@@ -1129,4 +1144,4 @@ Implementation technique is intentionally not prescribed. The delivered behavior
 37. Under `-Recurse`, the summary reports directory counters and `Structural differences`; these never alter the file-difference counters or the verdict rule.
 38. `Empty-directory differences` is a subset callout and is not added into `Structural differences`.
 39. Verdict segments and qualification clauses use the fixed order and zero-omission rules of Section 8.1, and the two structural segments sum to `Structural differences`.
-40. The legend reflects the active mode and lists only markers the report actually uses.
+40. When the report contains at least one file or directory-summary difference row, its legend always lists `<<`, `>>`, and `<>`, in that order, and lists `DIR` only when a directory-summary row is present; when there are no such rows, the entire `DIFFERENCES` section is omitted.
