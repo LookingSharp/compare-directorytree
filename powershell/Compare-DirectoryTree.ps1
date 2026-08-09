@@ -144,8 +144,56 @@ function Get-CDTPathSortKey {
 
     # A NUL separator makes an ordinal comparison of the joined key behave as a
     # segment-by-segment comparison, because NUL sorts below every path character.
+    # Names containing control characters are rejected (Section 9), so a segment
+    # can never contain the separator itself.
     $segments = $Path.TrimEnd('\').Split('\')
     ($segments | ForEach-Object { $_.ToLowerInvariant() }) -join "`0"
+}
+
+$script:CDTControlCharacterPattern = '[\x00-\x1F\x7F]'
+
+function Format-CDTSafeName {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Name
+    )
+
+    $evaluator = [System.Text.RegularExpressions.MatchEvaluator] {
+        param($match)
+        '<0x{0:X2}>' -f [int][char]$match.Value[0]
+    }
+
+    [regex]::Replace($Name, $script:CDTControlCharacterPattern, $evaluator)
+}
+
+function Assert-CDTNameSafe {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $Side,
+
+        [AllowEmptyString()]
+        [string] $Container = ''
+    )
+
+    $match = [regex]::Match($Name, $script:CDTControlCharacterPattern)
+    if (-not $match.Success) { return }
+
+    # The offending entry is identified by its root-relative path, the same way
+    # difference rows identify a file, so a nested violation can be located.
+    # Its containing path is already known to be free of control characters.
+    $reported = if ($Container) { Join-Path $Container $Name } else { $Name }
+
+    # The name is escaped before it reaches any output stream; emitting it raw
+    # would perform the terminal injection this check exists to prevent.
+    throw ("Illegal name on {0}: '{1}' contains ASCII control character 0x{2:X2}" -f
+        $Side, (Format-CDTSafeName -Name $reported), [int][char]$match.Value[0])
 }
 
 function Format-CDTCount {
@@ -174,6 +222,9 @@ function New-CDTDirectoryNode {
         [AllowEmptyString()]
         [string] $RelativePath,
 
+        [Parameter(Mandatory)]
+        [string] $Side,
+
         [switch] $Recurse
     )
 
@@ -184,6 +235,10 @@ function New-CDTDirectoryNode {
     }
     catch {
         throw "Cannot enumerate files in directory '$FullName': $($_.Exception.Message)"
+    }
+
+    foreach ($file in $files) {
+        Assert-CDTNameSafe -Name $file.Name -Side $Side -Container $RelativePath
     }
 
     $duplicateFiles = @($files | Group-Object -Property { $_.Name.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 })
@@ -216,6 +271,10 @@ function New-CDTDirectoryNode {
         throw "Cannot enumerate subdirectories in directory '$FullName': $($_.Exception.Message)"
     }
 
+    foreach ($subdirectory in $subdirectories) {
+        Assert-CDTNameSafe -Name $subdirectory.Name -Side $Side -Container $RelativePath
+    }
+
     $duplicateDirs = @($subdirectories | Group-Object -Property { $_.Name.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 })
     if ($duplicateDirs.Count -gt 0) {
         $colliding = ($duplicateDirs[0].Group | ForEach-Object { $_.Name } | Sort-Object) -join ', '
@@ -224,7 +283,7 @@ function New-CDTDirectoryNode {
 
     foreach ($subdirectory in ($subdirectories | Sort-Object -Property Name)) {
         $childRelative = if ($RelativePath) { Join-Path $RelativePath $subdirectory.Name } else { $subdirectory.Name }
-        $node.Dirs[$subdirectory.Name.ToLowerInvariant()] = New-CDTDirectoryNode -FullName $subdirectory.FullName -RelativePath $childRelative -Recurse
+        $node.Dirs[$subdirectory.Name.ToLowerInvariant()] = New-CDTDirectoryNode -FullName $subdirectory.FullName -RelativePath $childRelative -Side $Side -Recurse
     }
 
     $node
@@ -707,7 +766,13 @@ function Compare-DirectoryTree {
         throw '-ExpandMissingSubtrees requires -Recurse.'
     }
 
-    $roots = foreach ($candidate in @($ReferencePath, $DifferencePath)) {
+    $roots = @()
+    foreach ($side in @('LEFT', 'RIGHT')) {
+        $candidate = if ($side -eq 'LEFT') { $ReferencePath } else { $DifferencePath }
+
+        # Validate before any message can echo the supplied string back to the terminal.
+        Assert-CDTNameSafe -Name $candidate -Side $side
+
         if (-not (Test-Path -LiteralPath $candidate)) {
             throw "Path not found: $candidate"
         }
@@ -715,14 +780,16 @@ function Compare-DirectoryTree {
         if ($item -isnot [System.IO.DirectoryInfo]) {
             throw "Path is not a directory: $candidate"
         }
-        $item.FullName
+
+        Assert-CDTNameSafe -Name $item.FullName -Side $side
+        $roots += $item.FullName
     }
 
     $leftRoot = $roots[0]
     $rightRoot = $roots[1]
 
-    $leftTree = New-CDTDirectoryNode -FullName $leftRoot -RelativePath '' -Recurse:$Recurse
-    $rightTree = New-CDTDirectoryNode -FullName $rightRoot -RelativePath '' -Recurse:$Recurse
+    $leftTree = New-CDTDirectoryNode -FullName $leftRoot -RelativePath '' -Side 'LEFT' -Recurse:$Recurse
+    $rightTree = New-CDTDirectoryNode -FullName $rightRoot -RelativePath '' -Side 'RIGHT' -Recurse:$Recurse
 
     $mode = if ($Compact) { 'Compact' } elseif ($ExpandMissingSubtrees) { 'Expand' } else { 'Default' }
 

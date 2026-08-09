@@ -333,6 +333,144 @@ Describe 'Compare-DirectoryTree' {
         }
     }
 
+    Context 'Scenario 10.17 - control characters in names' {
+        It 'escapes every control character in a rendered name' {
+            $name = 'IMG' + [char]27 + '[32m' + [char]10 + [char]0 + [char]127 + '.JPG'
+
+            Format-CDTSafeName -Name $name | Should -Be 'IMG<0x1B>[32m<0x0A><0x00><0x7F>.JPG'
+        }
+
+        It 'rejects every ASCII control character' {
+            foreach ($code in @(0..31) + @(127)) {
+                $thrown = $false
+                try { Assert-CDTNameSafe -Name ('a' + [char]$code + 'b') -Side 'LEFT' } catch { $thrown = $true }
+                $thrown | Should -BeTrue -Because "0x$('{0:X2}' -f $code) must be rejected"
+            }
+        }
+
+        It 'accepts ordinary names and C1 code points' {
+            { Assert-CDTNameSafe -Name 'IMG_1901.JPG' -Side 'LEFT' } | Should -Not -Throw
+            { Assert-CDTNameSafe -Name ('Dad' + [char]0x92 + 's photos.jpg') -Side 'LEFT' } | Should -Not -Throw
+            Format-CDTSafeName -Name ('Dad' + [char]0x92 + 's.jpg') | Should -Be ('Dad' + [char]0x92 + 's.jpg')
+        }
+
+        It 'names the side, the escaped name, and the offending character' {
+            $message = $null
+            try {
+                Assert-CDTNameSafe -Name ('IMG_1901' + [char]27 + '[32m.JPG') -Side 'RIGHT'
+            }
+            catch {
+                $message = $_.Exception.Message
+            }
+
+            $message | Should -Be "Illegal name on RIGHT: 'IMG_1901<0x1B>[32m.JPG' contains ASCII control character 0x1B"
+            $message.Contains([char]27) | Should -BeFalse
+            @($message -split "`n").Count | Should -Be 1
+        }
+
+        It 'identifies a nested offender by its root-relative path' {
+            $message = $null
+            try {
+                Assert-CDTNameSafe -Name ('IMG_1901' + [char]27 + '.JPG') -Side 'LEFT' -Container '2018\Camp'
+            }
+            catch {
+                $message = $_.Exception.Message
+            }
+
+            $message | Should -Be "Illegal name on LEFT: '2018\Camp\IMG_1901<0x1B>.JPG' contains ASCII control character 0x1B"
+        }
+
+        It 'rejects a supplied path containing a control character without echoing it' {
+            foreach ($side in 'LEFT', 'RIGHT') {
+                $bad = Join-Path $Left ('evil' + [char]27 + '[32mdir')
+                $message = $null
+                try {
+                    if ($side -eq 'LEFT') {
+                        Compare-DirectoryTree $bad $Right -NoColor
+                    }
+                    else {
+                        Compare-DirectoryTree $Left $bad -NoColor
+                    }
+                }
+                catch {
+                    $message = $_.Exception.Message
+                }
+
+                $message | Should -BeLike "Illegal name on $side*"
+                $message.Contains([char]27) | Should -BeFalse
+            }
+        }
+
+        It 'fails when an in-scope file name contains a control character' {
+            $name = 'IMG_1901' + [char]27 + '[32m.JPG'
+            $path = Join-Path $Left $name
+            $created = $false
+            try {
+                $stream = [System.IO.File]::Create($path)
+                $stream.Dispose()
+                $created = Test-Path -LiteralPath $path
+            }
+            catch {
+                $created = $false
+            }
+
+            if (-not $created) {
+                Set-ItResult -Skipped -Because 'this filesystem does not permit control characters in a file name'
+                return
+            }
+
+            $message = $null
+            try { Compare-DirectoryTree $Left $Right -NoColor } catch { $message = $_.Exception.Message }
+
+            $message | Should -Be "Illegal name on LEFT: 'IMG_1901<0x1B>[32m.JPG' contains ASCII control character 0x1B"
+        }
+
+        It 'fails when an in-scope directory name contains a control character under -Recurse' {
+            $name = 'Camp' + [char]10 + 'Raw'
+            $path = Join-Path $Right $name
+            $created = $false
+            try {
+                New-Item -ItemType Directory -Path $path -Force -ErrorAction Stop | Out-Null
+                $created = Test-Path -LiteralPath $path
+            }
+            catch {
+                $created = $false
+            }
+
+            if (-not $created) {
+                Set-ItResult -Skipped -Because 'this filesystem does not permit control characters in a directory name'
+                return
+            }
+
+            $message = $null
+            try { Compare-DirectoryTree $Left $Right -Recurse -NoColor } catch { $message = $_.Exception.Message }
+
+            $message | Should -Be "Illegal name on RIGHT: 'Camp<0x0A>Raw' contains ASCII control character 0x0A"
+        }
+
+        It 'does not examine out-of-scope subdirectory names without -Recurse' {
+            $name = 'Camp' + [char]10 + 'Raw'
+            $path = Join-Path $Left $name
+            $created = $false
+            try {
+                New-Item -ItemType Directory -Path $path -Force -ErrorAction Stop | Out-Null
+                $created = Test-Path -LiteralPath $path
+            }
+            catch {
+                $created = $false
+            }
+
+            if (-not $created) {
+                Set-ItResult -Skipped -Because 'this filesystem does not permit control characters in a directory name'
+                return
+            }
+
+            $report = Compare-DirectoryTree $Left $Right -NoColor
+
+            Get-VerdictLine $report | Should -Be 'RESULT: MATCH - all 0 files match'
+        }
+    }
+
     Context 'Scenario 10.12 - verbose metadata explanation' {
         BeforeEach {
             New-TestFile (Join-Path $Left 'Thumbs.db') 1
