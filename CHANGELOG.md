@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- Specified path semantics in new Section 2.1: a root-relative path is a
+  sequence of name segments, matching and ordering operate on those segments,
+  and rendered paths, directory-row trailing separators, and the root display
+  token all use the host operating system's native directory separator. Only
+  the native separator delimits segments, so a separator character that is
+  legal in a filename on that host stays part of the name. Resolves the
+  Windows-only/cross-platform question tracked in issue #11.
 - Clarified Section 5.4 and Appendix B invariant 40: the legend always lists
   `<<`, `>>`, and `<>` whenever the `DIFFERENCES` section appears, `DIR` is
   listed only when a directory-summary row is present, and the whole
@@ -71,3 +78,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   differences table header is now `Type` / `File / Directory`.
 - Merged the report verdict/Type-column speclet into the authoritative
   specification and removed it from `specs/speclets/`.
+
+### Fixed
+
+- Path rendering and ordering no longer assume the Windows directory
+  separator. Root-relative paths were built with the host separator but split
+  and rendered with `\`, so on Linux and macOS segment-wise ordering and
+  directory-row rendering desynchronized from the actual path. The PowerShell
+  implementation now resolves the separator once and joins, splits, and renders
+  through that single seam, so reports read natively on every host.
