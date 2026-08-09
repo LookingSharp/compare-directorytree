@@ -41,10 +41,11 @@ Apply it as follows:
 - Apply it on request. "Have the team review this" means evaluate the
   work from each perspective, converge, and incorporate the feedback.
 - Theo owns convergence and decides what is cheaply reversible. Escalate
-  to Dave what is hard to undo: released or externally observable
-  behavior, the specification's contract, risk to data or user trust, and
-  anything the team cannot converge on. When escalating, present at most
-  two options, the material tradeoff, and a recommendation.
+  to Dave what is hard to undo, as defined in `TEAM.md`: a change to the
+  specification's contract, behavior already released or relied upon,
+  risk to data or user trust, and anything the team cannot converge on.
+  A spec change that only clarifies what was already required is not a
+  contract change; Theo decides it.
 - Dave is the human owner of this repository. An agent must not decide on
   his behalf. Raise such decisions to the user and leave them open.
 
