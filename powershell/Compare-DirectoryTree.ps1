@@ -134,6 +134,57 @@ function Format-CDTAggregateByteTotal {
     '{0} {1}' -f $text, $units[$unitIndex]
 }
 
+function Get-CDTPathSeparator {
+    [CmdletBinding()]
+    param()
+
+    # Single source of truth for path presentation and segmentation. Reports
+    # render natively for the host, and only this character delimits segments,
+    # so a separator that is legal in a filename on this host stays part of the
+    # name (specification Section 2.1).
+    [string][System.IO.Path]::DirectorySeparatorChar
+}
+
+function Join-CDTRelativePath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $ParentPath,
+
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    if ([string]::IsNullOrEmpty($ParentPath)) { return $Name }
+
+    '{0}{1}{2}' -f $ParentPath, (Get-CDTPathSeparator), $Name
+}
+
+function Split-CDTRelativePath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Path
+    )
+
+    $separator = Get-CDTPathSeparator
+    , @($Path.TrimEnd($separator[0]).Split($separator[0]))
+}
+
+function Format-CDTRelativeDirectoryPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $RelativePath
+    )
+
+    $separator = Get-CDTPathSeparator
+    if ([string]::IsNullOrEmpty($RelativePath)) { ".$separator" } else { "$RelativePath$separator" }
+}
+
 function Get-CDTPathSortKey {
     [CmdletBinding()]
     param(
@@ -144,7 +195,7 @@ function Get-CDTPathSortKey {
 
     # A NUL separator makes an ordinal comparison of the joined key behave as a
     # segment-by-segment comparison, because NUL sorts below every path character.
-    $segments = $Path.TrimEnd('\').Split('\')
+    $segments = Split-CDTRelativePath -Path $Path
     ($segments | ForEach-Object { $_.ToLowerInvariant() }) -join "`0"
 }
 
@@ -202,7 +253,7 @@ function New-CDTDirectoryNode {
     foreach ($file in ($files | Sort-Object -Property Name)) {
         $node.Files[$file.Name.ToLowerInvariant()] = [pscustomobject]@{
             Name         = $file.Name
-            RelativePath = if ($RelativePath) { Join-Path $RelativePath $file.Name } else { $file.Name }
+            RelativePath = Join-CDTRelativePath -ParentPath $RelativePath -Name $file.Name
             Length       = [long]$file.Length
         }
     }
@@ -223,7 +274,7 @@ function New-CDTDirectoryNode {
     }
 
     foreach ($subdirectory in ($subdirectories | Sort-Object -Property Name)) {
-        $childRelative = if ($RelativePath) { Join-Path $RelativePath $subdirectory.Name } else { $subdirectory.Name }
+        $childRelative = Join-CDTRelativePath -ParentPath $RelativePath -Name $subdirectory.Name
         $node.Dirs[$subdirectory.Name.ToLowerInvariant()] = New-CDTDirectoryNode -FullName $subdirectory.FullName -RelativePath $childRelative -Recurse
     }
 
@@ -331,17 +382,6 @@ function Format-CDTDirectorySummary {
     }
 
     $text
-}
-
-function Format-CDTRelativeDirectoryPath {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [AllowEmptyString()]
-        [string] $RelativePath
-    )
-
-    if ([string]::IsNullOrEmpty($RelativePath)) { '.\' } else { "$RelativePath\" }
 }
 
 function New-CDTFileRow {
