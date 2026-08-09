@@ -811,6 +811,22 @@ Describe 'Compare-DirectoryTree' {
             Get-CollapsedRow $rows '*Missing\*' | Should -Be '<< DIR Missing\ 2 files, 1 dir, 300 B'
         }
 
+        It 'renders the compared roots as .\ in a -Compact directory summary row' {
+            $pair = New-TestDirectoryPair
+            try {
+                New-TestFile (Join-Path $pair.Left 'rootonly.bin') 100
+                New-TestFile (Join-Path $pair.Left 'Sub\a.bin') 50
+
+                $rows = @(Get-DifferenceRow (Compare-DirectoryTree $pair.Left $pair.Right -Recurse -Compact -NoColor))
+                $root = @($rows | ForEach-Object { ($_ -replace '\s+', ' ').Trim() } | Where-Object { $_ -like '*DIR .\*' })
+
+                $root.Count | Should -Be 1
+                $root[0] | Should -Match '^<> DIR \.\\ '
+            } finally {
+                Remove-Item -LiteralPath $pair.Base -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
         It 'reports one-sided subtree files individually with -ExpandMissingSubtrees' {
             $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor))
 
@@ -839,6 +855,20 @@ Describe 'Compare-DirectoryTree' {
             Get-CollapsedRow $rows '<< DIR Raw\' | Should -BeNullOrEmpty
             Get-CollapsedRow $rows '<< DIR Raw\X\' | Should -BeNullOrEmpty
             Get-CollapsedRow $rows '<< DIR Empty\' | Should -BeNullOrEmpty
+        }
+
+        It 'orders empty-directory rows with file rows by segment in -ExpandMissingSubtrees mode' {
+            New-TestFile (Join-Path $Left 'Raw\IMG_1001.JPG') 100
+            New-TestFile (Join-Path $Left 'Raw\Nested\IMG_1002.JPG') 200
+            New-Item -ItemType Directory -Path (Join-Path $Left 'Raw\Empty') -Force | Out-Null
+
+            $rows = @(Get-DifferenceRow (Compare-DirectoryTree $Left $Right -Recurse -ExpandMissingSubtrees -NoColor))
+            $raw = @($rows | ForEach-Object { ($_ -replace '\s+', ' ').Trim() } | Where-Object { $_ -like '*Raw\*' })
+
+            $raw.Count | Should -Be 3
+            $raw[0] | Should -Be '<< DIR Raw\Empty\ 0 files, 0 dirs, 0 B'
+            $raw[1] | Should -Match '^<< Raw\\IMG_1001\.JPG 100 '
+            $raw[2] | Should -Match '^<< Raw\\Nested\\IMG_1002\.JPG 200 '
         }
 
         It 'keeps summary counts identical across recursive presentation modes' {

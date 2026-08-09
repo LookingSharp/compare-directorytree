@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   container directories rather than collapsing them.
 - Corrected the Section 5.2 canonical example, whose `<>` rows were listed in
   an order that contradicted the Section 5 ordering rule.
+- Corrected the Section 6.3 `-ExpandMissingSubtrees` example, whose rows were
+  listed in an order that contradicted the Section 5 ordering rule.
 
 - Replaced the placeholder authoritative specification
   `specs/Compare-DirectoryTree-Spec.md` with the working-draft Directory File

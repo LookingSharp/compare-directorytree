@@ -377,9 +377,9 @@ Use normal file-level reporting even inside directories that exist on only one s
 Example:
 
 ```text
+<<  DIR   2018\Camp\Raw\Empty\             0 files, 0 dirs, 0 B
 <<        2018\Camp\Raw\IMG_1001.JPG             5,238,104        <missing>
 <<        2018\Camp\Raw\Nested\IMG_1002.JPG      4,921,772        <missing>
-<<  DIR   2018\Camp\Raw\Empty\             0 files, 0 dirs, 0 B
 ```
 
 This mode is intentionally verbose and is intended for cases where the user wants the full inventory of a missing subtree.
