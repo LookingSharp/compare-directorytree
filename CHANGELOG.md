@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- Python implementation of `compare_directorytree` in
+  `python/compare_directorytree/`, covering the report model, metadata
+  catalog and policy, summary and verdict semantics, error and ambiguity
+  handling, `--recurse` with all three presentation modes,
+  `--explain-metadata`, and console color with `--no-color`.
+- Standard-library `unittest` validation tests in
+  `python/tests/test_compare_directorytree.py` covering the Section 10
+  acceptance scenarios and the Appendix B invariants.
 - PowerShell implementation of `Compare-DirectoryTree` in
   `powershell/Compare-DirectoryTree.ps1`, covering the report model, metadata
   catalog and policy, summary and verdict semantics, error and ambiguity

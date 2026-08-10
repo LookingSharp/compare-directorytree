@@ -3,10 +3,10 @@
 Compare-DirectoryTree is a tool for comparing directory trees and reporting
 structural, content, and metadata differences.
 
-This repository is implementation-language-neutral. The first and current
-implementation is PowerShell, found under [`powershell/`](powershell/).
-Additional language implementations may be added later without restructuring
-the top-level project.
+This repository is implementation-language-neutral. Implementations exist for
+PowerShell, found under [`powershell/`](powershell/), and Python, found under
+[`python/`](python/). Additional language implementations may be added later
+without restructuring the top-level project.
 
 ## Specification
 
