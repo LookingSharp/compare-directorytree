@@ -202,7 +202,7 @@ function New-CDTDirectoryNode {
     foreach ($file in ($files | Sort-Object -Property Name)) {
         $node.Files[$file.Name.ToLowerInvariant()] = [pscustomobject]@{
             Name         = $file.Name
-            RelativePath = if ($RelativePath) { Join-Path $RelativePath $file.Name } else { $file.Name }
+            RelativePath = if ($RelativePath) { "$RelativePath\$($file.Name)" } else { $file.Name }
             Length       = [long]$file.Length
         }
     }
@@ -223,7 +223,7 @@ function New-CDTDirectoryNode {
     }
 
     foreach ($subdirectory in ($subdirectories | Sort-Object -Property Name)) {
-        $childRelative = if ($RelativePath) { Join-Path $RelativePath $subdirectory.Name } else { $subdirectory.Name }
+        $childRelative = if ($RelativePath) { "$RelativePath\$($subdirectory.Name)" } else { $subdirectory.Name }
         $node.Dirs[$subdirectory.Name.ToLowerInvariant()] = New-CDTDirectoryNode -FullName $subdirectory.FullName -RelativePath $childRelative -Recurse
     }
 
