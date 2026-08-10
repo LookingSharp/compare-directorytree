@@ -28,6 +28,11 @@ def format_aggregate_byte_total(num_bytes: int) -> str:
         unit_index += 1
 
     rounded = round(value, 1)
+    if rounded >= 1024 and unit_index < len(_UNITS) - 1:
+        value /= 1024
+        unit_index += 1
+        rounded = round(value, 1)
+
     if rounded == int(rounded):
         text = str(int(rounded))
     else:

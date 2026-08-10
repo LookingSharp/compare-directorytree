@@ -129,6 +129,12 @@ function Format-CDTAggregateByteTotal {
     }
 
     $rounded = [math]::Round($value, 1)
+    if ($rounded -ge 1024 -and $unitIndex -lt ($units.Count - 1)) {
+        $value = $value / 1024
+        $unitIndex++
+        $rounded = [math]::Round($value, 1)
+    }
+
     $text = $rounded.ToString('0.#', [cultureinfo]::InvariantCulture)
 
     '{0} {1}' -f $text, $units[$unitIndex]
@@ -909,5 +915,8 @@ function Compare-DirectoryTree {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+    if (-not $PSBoundParameters.ContainsKey('ReferencePath') -or -not $PSBoundParameters.ContainsKey('DifferencePath')) {
+        throw 'Compare-DirectoryTree.ps1: missing mandatory parameters ReferencePath and/or DifferencePath.'
+    }
     Compare-DirectoryTree @PSBoundParameters
 }

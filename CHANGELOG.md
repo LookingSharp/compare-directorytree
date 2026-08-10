@@ -79,3 +79,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   differences table header is now `Type` / `File / Directory`.
 - Merged the report verdict/Type-column speclet into the authoritative
   specification and removed it from `specs/speclets/`.
+
+### Fixed
+
+- PowerShell: root-relative file and directory paths were built with
+  `Join-Path`, which uses the host's native path separator (`/` on
+  non-Windows hosts) instead of the `\` convention used consistently
+  elsewhere in the report (sorting, display, and the test suite). Paths are
+  now always joined with a literal `\`.
+- Both implementations: `Format-CDTAggregateByteTotal` /
+  `format_aggregate_byte_total` could display a rounded value of `1024` in
+  the current unit (e.g. `1024 KB`) instead of advancing to the next unit
+  (`1 MB`), when the true value was just under a unit boundary. The
+  unit selection is now re-checked after rounding.
+- PowerShell: running `Compare-DirectoryTree.ps1` directly without the
+  required `ReferencePath`/`DifferencePath` arguments produced a
+  parameter-binding error but still exited with code `0`, making the
+  failure indistinguishable from success to calling scripts. The script now
+  fails with a clear error and a non-zero exit code.
+- Python: an excessively deep directory tree under `--recurse` raised an
+  uncaught `RecursionError` instead of the clear, catchable
+  `ComparisonError` that Section 9 requires for input that cannot be fully
+  enumerated.

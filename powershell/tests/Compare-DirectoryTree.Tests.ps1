@@ -331,6 +331,12 @@ Describe 'Compare-DirectoryTree' {
 
             { Compare-DirectoryTree $Left $Right -Recurse -NoColor } | Should -Throw "*$denied*"
         }
+
+        It 'exits with a non-zero code when invoked directly without required arguments' {
+            $shell = (Get-Process -Id $PID).Path
+            & $shell -NoProfile -File $script:ScriptPath *>$null
+            $LASTEXITCODE | Should -Not -Be 0
+        }
     }
 
     Context 'Scenario 10.12 - verbose metadata explanation' {
@@ -573,6 +579,11 @@ Describe 'Compare-DirectoryTree' {
             Format-CDTAggregateByteTotal -Bytes 1024 | Should -Be '1 KB'
             Format-CDTAggregateByteTotal -Bytes 81920 | Should -Be '80 KB'
             Format-CDTAggregateByteTotal -Bytes 8375186227 | Should -Be '7.8 GB'
+        }
+
+        It 'rounds up to the next unit instead of displaying 1024 of the current unit' {
+            Format-CDTAggregateByteTotal -Bytes 1048575 | Should -Be '1 MB'
+            Format-CDTAggregateByteTotal -Bytes 1073741823 | Should -Be '1 GB'
         }
 
         It 'begins a directory-summary row text in the LEFT size column' {

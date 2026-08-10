@@ -330,6 +330,20 @@ def color_supported(stream=None) -> bool:
         return False
 
 
+def _build_directory_node_safely(root: str, recurse: bool) -> DirectoryNode:
+    """Build a directory node, converting an excessively deep tree into a
+    clear ``ComparisonError`` (Section 9: fail clearly rather than crash)
+    instead of letting an uncaught ``RecursionError`` escape.
+    """
+
+    try:
+        return build_directory_node(root, "", recurse=recurse)
+    except RecursionError as exc:
+        raise ComparisonError(
+            f"Cannot enumerate directory '{root}': directory tree is too deeply nested to enumerate reliably"
+        ) from exc
+
+
 def compare_directory_tree(
     reference_path: str,
     difference_path: str,
@@ -364,8 +378,8 @@ def compare_directory_tree(
 
     left_root, right_root = roots
 
-    left_tree = build_directory_node(left_root, "", recurse=recurse)
-    right_tree = build_directory_node(right_root, "", recurse=recurse)
+    left_tree = _build_directory_node_safely(left_root, recurse)
+    right_tree = _build_directory_node_safely(right_root, recurse)
 
     mode = "Compact" if compact else "Expand" if expand_missing_subtrees else "Default"
 

@@ -261,6 +261,16 @@ class CompareDirectoryTreeTestCase(unittest.TestCase):
         finally:
             os.chmod(denied, 0o755)
 
+    def test_10_11_excessively_deep_tree_fails_clearly(self):
+        from unittest import mock
+
+        from compare_directorytree import report as report_module
+
+        with mock.patch.object(report_module, "build_directory_node", side_effect=RecursionError()):
+            with self.assertRaises(ComparisonError) as ctx:
+                compare_directory_tree(self.left, self.right, recurse=True, no_color=True)
+        self.assertIn("too deeply nested", str(ctx.exception))
+
     # 10.12 Verbose metadata explanation
     def test_10_12_explains_each_type_once(self):
         make_file(os.path.join(self.left, "Thumbs.db"), 1)
@@ -434,6 +444,12 @@ class CompareDirectoryTreeTestCase(unittest.TestCase):
         self.assertEqual(format_aggregate_byte_total(1024), "1 KB")
         self.assertEqual(format_aggregate_byte_total(81920), "80 KB")
         self.assertEqual(format_aggregate_byte_total(8375186227), "7.8 GB")
+
+    def test_10_16_aggregate_byte_total_rounds_up_to_next_unit(self):
+        # A value that rounds to 1024 of a unit must bump to the next unit
+        # rather than displaying e.g. "1024 KB".
+        self.assertEqual(format_aggregate_byte_total(1048575), "1 MB")
+        self.assertEqual(format_aggregate_byte_total(1073741823), "1 GB")
 
     def test_10_16_directory_summary_vs_file_size_formatting(self):
         make_file(os.path.join(self.left, "Cache", "big.bin"), 81920)
