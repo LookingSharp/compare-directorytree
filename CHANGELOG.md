@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- Rust implementation of `Compare-DirectoryTree` in `rust/`, including the
+  zero-dependency Cargo CLI, recursive presentation modes, metadata catalog
+  policy, summary and verdict semantics, report rendering, and `--no-color`
+  / interactive-terminal color behavior.
+- Rust integration tests in `rust/tests/` covering the Section 10 acceptance
+  scenarios, recursive presentation modes, ANSI color rules, deterministic
+  ordering, legend content, metadata classification, and verdict grammar.
 - PowerShell implementation of `Compare-DirectoryTree` in
   `powershell/Compare-DirectoryTree.ps1`, covering the report model, metadata
   catalog and policy, summary and verdict semantics, error and ambiguity
