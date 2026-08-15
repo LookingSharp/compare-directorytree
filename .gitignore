@@ -12,6 +12,8 @@ Thumbs.db
 # Test output
 TestResults/
 *.trx
+rust/target/
+rust/test-work/
 
 # Local environment overrides
 *.local
