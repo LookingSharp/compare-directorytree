@@ -60,6 +60,34 @@ Recursive presentation mode that reports one-sided subtrees file by file. Requir
 
 Suppresses console color even in an interactive terminal. See Section 7.
 
+### 2.1 Path model and presentation
+
+The tool is not bound to one operating system's path syntax.
+
+A root-relative path is an ordered sequence of name segments. Matching
+(Section 3) and ordering (Section 5) operate on those segments and do not
+depend on any separator character.
+
+For display, a root-relative path is rendered by joining its segments with the
+directory separator the host operating system uses natively, so a report reads
+as it would in the environment the tool is running in. Directory-summary rows
+end with that same separator, and the root display token is `.` followed by it.
+
+| Host | File path | Directory row | Root token |
+| --- | --- | --- | --- |
+| Windows | `2018\Camp\IMG.JPG` | `2018\Camp\` | `.\` |
+| Linux, macOS | `2018/Camp/IMG.JPG` | `2018/Camp/` | `./` |
+
+Only the native separator delimits segments. On a host where some other
+separator character is a legal filename character, that character is an
+ordinary part of a name and never splits a path.
+
+The supplied `LEFT` and `RIGHT` root paths are reported as the host resolves
+them and are not rewritten.
+
+Examples throughout this specification use the Windows separator. They
+illustrate row grammar and content; they do not prescribe a separator.
+
 ## 3. Definition of Same
 
 Files are matched by filename, case-insensitively. Under `-Recurse`, files are matched by their root-relative path, with each path segment compared case-insensitively.
@@ -133,6 +161,7 @@ Ordering rules:
 
 - Entries are ordered by their root-relative path, compared segment by segment. Without `-Recurse` this path is simply the filename.
 - Each segment is compared using a case-insensitive ordinal comparison.
+- Segmentation is a property of the path model (Section 2.1), so ordering is identical on every host regardless of which separator renders the path.
 - Directory-summary rows sort at their own directory path, so a directory row and the file rows sharing its parent interleave in one ordering rather than being grouped into separate directory and file blocks.
 - Because case-insensitive path collisions are an error (Section 9), no two entries in a class can compare equal.
 
@@ -354,13 +383,13 @@ A directory containing only matching direct files and whose descendant differenc
 
 The compared roots together constitute the shared root directory for reporting. When that directory meets the Compact row criteria above, it produces one Compact `DIR` row; its direct file differences are not emitted as individual file rows.
 
-The root directory has an empty root-relative path. For display, render that path as `.\`:
+The root directory has an empty root-relative path. For display, render that path as the root display token of Section 2.1, which is `.\` on Windows and `./` on Linux and macOS:
 
 ```text
 <>  DIR   .\                                    0 same | << 1 | >> 0 | <> 0
 ```
 
-The `.\` token denotes the compared roots named by the `LEFT` and `RIGHT` report headers. It is a display token only; the root-relative path remains empty for matching and ordering.
+The root display token denotes the compared roots named by the `LEFT` and `RIGHT` report headers. It is a display token only; the root-relative path remains empty for matching and ordering.
 
 ### 6.3 `-ExpandMissingSubtrees`
 
@@ -1014,6 +1043,16 @@ The report implementation must demonstrate at least these behaviors:
 12. Verdict counts use singular nouns when the count is one.
 13. The verdict's `empty-subdirectory differences` and `directory-structure differences` sum to the `Structural differences` summary counter.
 
+### 10.17 Path presentation
+
+The path implementation must demonstrate at least these behaviors:
+
+1. Rendered root-relative file paths join their segments with the host's native directory separator.
+2. Directory-summary rows end with the host's native directory separator.
+3. The root display token is `.` followed by the host's native directory separator.
+4. Ordering within a difference class is segment-wise and produces the same relative order on every host, so a path with an extra segment sorts before a longer sibling name in the same parent.
+5. A separator character that is not native to the host is treated as an ordinary filename character and does not split a path.
+
 ## 11. Out of Scope
 
 The utility does not:
@@ -1145,3 +1184,6 @@ Implementation technique is intentionally not prescribed. The delivered behavior
 38. `Empty-directory differences` is a subset callout and is not added into `Structural differences`.
 39. Verdict segments and qualification clauses use the fixed order and zero-omission rules of Section 8.1, and the two structural segments sum to `Structural differences`.
 40. When the report contains at least one file or directory-summary difference row, its legend always lists `<<`, `>>`, and `<>`, in that order, and lists `DIR` only when a directory-summary row is present; when there are no such rows, the entire `DIFFERENCES` section is omitted.
+41. Matching and ordering operate on path segments and do not depend on the separator used to render a path.
+42. Rendered paths, the trailing separator on directory-summary rows, and the root display token all use the host operating system's native directory separator.
+43. Only the native separator delimits path segments; any other separator character is treated as an ordinary filename character.
