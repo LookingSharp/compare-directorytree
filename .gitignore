@@ -14,6 +14,8 @@ TestResults/
 *.trx
 rust/target/
 rust/test-work/
+asm/src/*.obj
+asm/src/*.exe
 
 # Local environment overrides
 *.local

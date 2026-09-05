@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- Assembly implementation of `Compare-DirectoryTree` in `asm/`: an x86-64
+  NASM implementation for Windows (Win64 calling convention, `kernel32.dll`
+  only, no CRT/heap) covering the non-recursive base comparison, the Section
+  10 acceptance scenarios in scope, dynamic-width `DIFFERENCES` table
+  rendering, singular/plural verdict grammar, and the Appendix A.1 exact-name
+  ignored-metadata catalog with per-entry `Ignored: <note>` text. Recursive
+  comparison, `-ExplainMetadata`, color output, Appendix A.2 wildcard
+  metadata, and non-ASCII filename display are explicitly out of scope for
+  this version; see `asm/README.md` for the full list.
+- Smoke-test harness in `asm/tests/run-tests.sh` covering the Section 10
+  acceptance scenarios in scope for the assembly implementation.
 - Rust implementation of `Compare-DirectoryTree` in `rust/`, including the
   zero-dependency Cargo CLI, recursive presentation modes, metadata catalog
   policy, summary and verdict semantics, report rendering, and `--no-color`

@@ -4,8 +4,9 @@ Compare-DirectoryTree is a tool for comparing directory trees and reporting
 structural, content, and metadata differences.
 
 This repository is implementation-language-neutral. Current implementations are
-PowerShell under [`powershell/`](powershell/) and Rust under
-[`rust/`](rust/). Additional language implementations may be added later
+PowerShell under [`powershell/`](powershell/), Rust under
+[`rust/`](rust/), and x86-64 assembly (Windows, NASM) under
+[`asm/`](asm/). Additional language implementations may be added later
 without restructuring the top-level project.
 
 ## Specification
