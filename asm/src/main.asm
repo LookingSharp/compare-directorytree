@@ -445,17 +445,27 @@ EnumerateDirectory:
     mov [rsp+32], r9         ; countPtr
 
     ; build pattern into scratch buffer: copy dir path then append "\*\0"
+    ; patternBuf holds 512 WCHARs; reserve 3 for "\*\0" and bounds-check the
+    ; copy so an overlong path (e.g. a maliciously long command line) fails
+    ; cleanly instead of overflowing into adjacent .bss data.
     mov rax, [rsp+56]       ; rax = &pathW
     mov rsi, [rax]          ; rsi = pathW (actual wide string pointer)
     lea rdi, [rel patternBuf]
+    xor r10d, r10d          ; r10 = WCHARs copied so far
 .copyPath:
+    cmp r10d, 509
+    jae .pathOverflow
     movzx eax, word [rsi]
     test ax, ax
     jz .pathDone
     mov [rdi], ax
     add rsi, 2
     add rdi, 2
+    inc r10d
     jmp .copyPath
+.pathOverflow:
+    mov eax, 1
+    jmp .ret
 .pathDone:
     mov word [rdi], 0x5C     ; '\'
     add rdi, 2
